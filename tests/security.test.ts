@@ -8,7 +8,7 @@ test('frontière HTTP : champs inconnus, téléportation, index et tailles rejet
     { ...create, host: 'other' },
     { ...create, name: '<script>alert(1)</script>' },
     { ...create, name: 'x'.repeat(25) },
-    { ...create, capacity: 8 },
+    { ...create, capacity: 5 },
   ])
     assert.equal(commandSchema.safeParse(invalid).success, false);
   const play = {

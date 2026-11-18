@@ -1,8 +1,10 @@
-import type { Game, View } from './types';
+import type { Capacity, Game, Person, View } from './types';
+export type ChatMessage = { id: string; name: string; text: string; at: string; me: boolean };
 export type Room = {
   host: string;
-  capacity: 2 | 3 | 4 | 6;
-  people: { id: string; name: string }[];
+  capacity: Capacity;
+  people: Person[];
+  jokers?: boolean;
   game: Game | null;
 };
 export type RoomView = {
@@ -10,6 +12,8 @@ export type RoomView = {
   version: number;
   host: boolean;
   capacity: number;
-  people: { name: string; me: boolean }[];
+  people: { name: string; me: boolean; bot: boolean }[];
   game: View | null;
+  jokers: boolean;
+  messages: ChatMessage[];
 };

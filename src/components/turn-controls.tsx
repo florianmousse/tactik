@@ -1,0 +1,222 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { CARDS, type BaseCard, type Move, type Play, type View } from '@/game/types';
+import { cardSymbol, cardTitle, moveLabel, COLOR_NAMES } from '@/game/labels';
+import { PALETTE } from './board';
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+export function TurnControls({
+  view,
+  busy,
+  selectedPiece,
+  onPiece,
+  onPlayable,
+  onExchange,
+  onPlay,
+  onDiscardHand,
+}: {
+  view: View;
+  busy: boolean;
+  selectedPiece?: string;
+  onPiece: (id: string | undefined) => void;
+  onPlayable: (ids: string[]) => void;
+  onExchange: (index: number) => void;
+  onPlay: (action: Play) => void;
+  onDiscardHand: () => void;
+}) {
+  const [card, setCard] = useState<number | null>(null),
+    [as, setAs] = useState<BaseCard | undefined>(),
+    [draft, setDraft] = useState<Move[]>([]);
+  // Chat and other players' exchange confirmations must not erase the local choice.
+  const revision = JSON.stringify([
+    view.phase,
+    view.turn,
+    view.hand,
+    view.pieces,
+    view.exchanged[view.me],
+  ]);
+  useEffect(() => {
+    setCard(null);
+    setDraft([]);
+    setAs(undefined);
+    onPiece(undefined);
+  }, [revision, onPiece]);
+  const isTurn = view.phase === 'play' && view.turn === view.me,
+    exchanging = view.phase === 'exchange' && !view.exchanged[view.me];
+  const actions =
+    card === null
+      ? []
+      : view.options.filter(
+          (p) => p.cardIndex === card && p.as === as && draft.every((m, i) => same(m, p.moves[i])),
+        );
+  const next = [
+    ...new Map(
+      actions
+        .filter((p) => p.moves.length > draft.length)
+        .map((p) => {
+          const m = p.moves[draft.length];
+          return [JSON.stringify(m), m];
+        }),
+    ).values(),
+  ];
+  const ids = [...new Set(next.map((m) => m.piece))];
+  const idsKey = ids.join(',');
+  useEffect(() => {
+    onPlayable(ids);
+  }, [idsKey, onPlayable]);
+  const complete = draft.length > 0 && actions.some((p) => p.moves.length === draft.length),
+    discard = isTurn && !view.options.length;
+  function choose(index: number) {
+    setCard(index);
+    setDraft([]);
+    setAs(undefined);
+    onPiece(undefined);
+  }
+  const status =
+    view.phase === 'finished'
+      ? `Victoire : ${view.players
+          .filter((p) => p.team === view.winner)
+          .map((p) => p.name)
+          .join(' + ')}`
+      : exchanging
+        ? 'Sélectionner une carte à échanger'
+        : view.phase === 'exchange'
+          ? 'Échange confirmé'
+          : !isTurn
+            ? `Tour de ${view.players[view.turn].name}`
+            : discard
+              ? 'Aucun déplacement possible'
+              : card === null
+                ? 'Sélectionner une carte'
+                : view.hand[card] === 'joker' && as === undefined
+                  ? 'Choisir la valeur du Joker'
+                  : complete
+                    ? 'Coup prêt'
+                    : selectedPiece
+                      ? 'Sélectionner un déplacement'
+                      : 'Sélectionner un pion';
+  return (
+    <section className="turn-controls" aria-label="Cartes et actions">
+      <div className="turn-status" role="status">
+        <span className={isTurn || exchanging ? 'turn-indicator active' : 'turn-indicator'} />
+        <b>{status}</b>
+        <span>{view.hand.length} cartes</span>
+      </div>
+      <div className="hand">
+        {view.hand.map((c, i) => (
+          <button
+            key={`${i}-${c}`}
+            className={`playing-card ${card === i ? 'chosen' : ''} ${c === 'joker' ? 'joker' : ''}`}
+            disabled={busy || (!isTurn && !exchanging)}
+            aria-pressed={card === i}
+            aria-label={`Carte ${cardSymbol(c)}, ${cardTitle(c)}`}
+            onClick={() => choose(i)}
+          >
+            <strong>{cardSymbol(c)}</strong>
+            <span>{cardTitle(c)}</span>
+          </button>
+        ))}
+      </div>
+      {card !== null && view.hand[card] === 'joker' && isTurn && (
+        <div className="joker-options" aria-label="Valeur du Joker">
+          {CARDS.map((c) => (
+            <button
+              key={c}
+              disabled={busy}
+              aria-pressed={as === c}
+              className={as === c ? 'selected' : ''}
+              onClick={() => {
+                setAs(c);
+                setDraft([]);
+                onPiece(undefined);
+              }}
+            >
+              {cardSymbol(c)}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="move-editor">
+        {draft.length > 0 && (
+          <div className="draft">
+            <ol>
+              {draft.map((m, i) => (
+                <li key={i}>{moveLabel(m)}</li>
+              ))}
+            </ol>
+            <button
+              onClick={() => {
+                setDraft([]);
+                onPiece(undefined);
+              }}
+              disabled={busy}
+            >
+              Annuler
+            </button>
+          </div>
+        )}
+        {card !== null && (view.hand[card] === 7 || as === 7) && isTurn && (
+          <small>{draft.reduce((n, m) => n + (m.kind === 'move' ? m.steps : 0), 0)} / 7 pas</small>
+        )}
+        {!complete && ids.length > 0 && (
+          <div className="piece-choices" aria-label="Pions jouables">
+            {ids.map((id) => (
+              <button
+                key={id}
+                disabled={busy}
+                aria-pressed={selectedPiece === id}
+                onClick={() => onPiece(id)}
+              >
+                <i style={{ background: PALETTE[Number(id[0])] }} />
+                {COLOR_NAMES[Number(id[0])]} {Number(id[2]) + 1}
+              </button>
+            ))}
+          </div>
+        )}
+        {selectedPiece && !complete && (
+          <div className="move-options">
+            {next
+              .filter((m) => m.piece === selectedPiece)
+              .map((m) => (
+                <button
+                  key={JSON.stringify(m)}
+                  disabled={busy}
+                  onClick={() => {
+                    setDraft([...draft, m]);
+                    onPiece(undefined);
+                  }}
+                >
+                  {moveLabel(m)}
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
+      <div className="turn-buttons">
+        {view.canDiscardHand && (
+          <button className="secondary" disabled={busy} onClick={onDiscardHand}>
+            Défausser toute la main
+          </button>
+        )}
+        {view.phase !== 'finished' && (
+          <button
+            className="primary"
+            disabled={busy || card === null || (!exchanging && !(isTurn && (complete || discard)))}
+            onClick={() => {
+              if (card === null) return;
+              if (exchanging) onExchange(card);
+              else onPlay({ cardIndex: card, moves: draft, ...(as === undefined ? {} : { as }) });
+            }}
+          >
+            {busy
+              ? 'Envoi...'
+              : exchanging
+                ? 'Échanger'
+                : discard
+                  ? 'Défausser la carte'
+                  : 'Valider le coup'}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}

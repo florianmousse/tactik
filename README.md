@@ -1,111 +1,108 @@
-# TacTik
+# TAC-TIK
 
-Une table de TAC-TIK dans le navigateur : salons privés, cartes personnelles, parties à 2, 3, 4 ou 6 joueurs, et entraînement local avec joueurs automatiques. Interface française, plateau SVG dessiné pour le projet, couleurs bois, sauge et corail.
+Jeu de plateau web pour 2, 3, 4, 6 ou 8 joueurs. Salons privés, chat, humains et bots, Joker et sauvegarde en ligne. Le plateau SVG reprend les chemins, maisons, réserves et panneaux rectangulaires de la photo fournie. Les cartes et la validation restent dans le même panneau.
 
-**État : première version implémentée.** Le mode local fonctionne sans service externe. Le multijoueur nécessite un projet Supabase et un déploiement Vercel configurés. Il n’a pas encore été validé contre un véritable projet Supabase ; les tests d’intégration fournis et la recette à plusieurs navigateurs sont nécessaires avant ouverture publique. Aucun compte externe ni déploiement n’a été créé automatiquement.
+**Site déjà publié :** lire [UPGRADE.md](docs/UPGRADE.md) pour appliquer la deuxième migration et corriger la configuration Vercel/Supabase. Le mode solo est utilisable sans service externe. La nouvelle version du multijoueur exige encore la migration et une recette sur le service configuré.
 
-## Démarrage rapide
+## Démarrer
 
-Prérequis : Node.js 22 ou plus récent, npm et, pour publier, un dépôt Git et les comptes Vercel/Supabase/Cloudflare Turnstile.
+Node.js 22 ou supérieur et npm.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Ouvrir `http://localhost:3000`, choisir le nombre de joueurs et cliquer sur **Essayer avec des joueurs automatiques**. Pas de variables requises pour ce mode. Les robots sont des partenaires d’entraînement simples, pas une IA stratégique. Une actualisation réinitialise l’entraînement.
-
-Pour tester une compilation de production :
-
-```sh
-npm run check
-npm run build
-npm start
-```
-
-Sous Windows, utiliser `npm.cmd` si la stratégie PowerShell bloque `npm.ps1`.
+Ouvrir `http://127.0.0.1:3000`. Choisir le nombre de joueurs puis **Jouer contre des bots**, ou créer/rejoindre un salon connecté. Sous PowerShell, utiliser `npm.cmd` si `npm.ps1` est bloqué.
 
 ## Fonctionnalités
 
-- Création d’un salon par pseudo, capacité fixe, invitation par code de 12 caractères hexadécimaux ou lien.
-- Les places sont attribuées par ordre d’arrivée. À 4/6, les partenaires sont opposés. À 2/3, chacun contrôle deux couleurs.
-- Seul l’hôte peut commencer, et uniquement lorsque toutes les places sont occupées.
-- Distribution, échange simultané secret, jeu obligatoire, défausse lorsqu’aucune carte n’est jouable.
-- Pieux protégés et bloquants, capture, recul, permutation, maisons, 7 fractionné, aide au partenaire et victoire.
-- Aide aux coups : choisir une carte, un pion, puis son déplacement ; composer les déplacements du 7 avant confirmation.
-- Sauvegarde de chaque action en base, notification Realtime privée et resynchronisation de secours toutes les 15 secondes lorsque l’onglet est visible.
-- Reconnexion : reprise automatique en rouvrant le lien avec le même navigateur et sa session Supabase, ou saisie du code pour rejoindre à nouveau. Le pseudo ne sert jamais de preuve d’identité.
+- A 2/3, deux couleurs par joueur. A 4/6/8, équipes de deux aux places opposées.
+- Pieux, démarrage, captures, recul, permutation, 7 fractionné, maisons, aide au partenaire et victoire.
+- 1 Joker par paquet, activé par défaut pour les nouveaux salons. Il remplace une carte ordinaire annoncée. Deux paquets à 8 joueurs : 98 cartes avec Jokers, 96 sans.
+- Défausse complète si tous les pions contrôlés sont en réserve, sans 1, 10 ou Joker. Un pion sur le parcours interdit cette option, y compris derrière un pieu.
+- Bots locaux en solo, ou bots côté serveur ajoutés aux places libres du salon avant le début. Ils ne voient pas les cartes adverses.
+- Chat réservé aux membres, 500 caractères par message, 12 envois/minute/utilisateur. Les 100 derniers messages sont conservés et les 50 derniers affichés.
+- Main, valeur du Joker, choix du pion, déplacement et validation regroupés. Vue mobile limitée à la hauteur de la fenêtre ; plateau agrandissable.
+- Invitations par code ou lien, sauvegarde atomique et reprise avec la même session navigateur.
 
 ## Architecture
 
 ```text
 src/
   app/
-    layout.tsx              Métadonnées, langue, styles
-    page.tsx                Page dynamique (nonce CSP par requête)
-    globals.css             Design responsive, sans police ni image externe
-    api/game/route.ts       Frontière HTTP : origine, auth, limites, validation
+    api/game/route.ts       Origine, auth, quotas, limite de corps, validation
+    page.tsx               Page dynamique pour le nonce CSP
+    layout.tsx             Métadonnées et langue
+    globals.css            Interface responsive
   components/
-    game-app.tsx            Accueil, salon, main, composition des coups, mode local
-    board.tsx               Plateau SVG accessible et pions
+    game-app.tsx           Connexion, salons, synchronisation et mode solo
+    turn-controls.tsx      Main, Joker, composition et validation du coup
+    board.tsx              Plateau SVG et pions accessibles
+    chat.tsx               Messages, envoi idempotent et erreurs
   game/
-    types.ts                Modèle de jeu et projection privée
-    engine.ts               Règles pures, coups légaux, transitions, projection
-    room.ts                 Contrats du salon
-  lib/supabase.ts           Client navigateur : identité et notifications
+    types.ts               Types du jeu
+    engine.ts              Règles pures, coups légaux et projection privée
+    bots.ts                Décisions depuis la seule projection du bot
+    board-layout.ts        Coordonnées des panneaux, chemins et maisons
+    labels.ts              Libellés et couleurs
+    room.ts                Contrats des salons et messages
   server/
-    schema.ts               Contrats Zod stricts pour les commandes
-    store.ts                Accès serveur, RNG cryptographique, CAS, quotas
-  proxy.ts                  CSP avec nonce, absence de scripts inline arbitraires
-supabase/migrations/        Schéma SQL, RLS, fonctions atomiques, publication
-tests/                      Tests des règles et validation des entrées
-tests/integration/          Vérification réelle RLS, RPC, concurrence et quotas
-docs/
-  DEPLOYMENT.md             Configuration Supabase, Turnstile et Vercel
-  ARCHITECTURE.md           Flux, invariants, décisions et modèle de données
-  RULES.md                  Traduction des règles et hypothèses explicites
-  SECURITY.md               Modèle de menace, protections et limites
-  TESTING.md                Commandes, recette et état des vérifications
-AGENTS.md                   Guide de contribution pour agents et développeurs
+    schema.ts              Commandes Zod strictes
+    store.ts               Stockage, RNG cryptographique, CAS et chat
+    origin.ts              Validation de l'origine configurée
+  lib/
+    supabase.ts            Client Auth/Realtime
+    game-api.ts            Requêtes authentifiées et erreurs HTTP
+    auth-errors.ts         Diagnostics sans données sensibles
+    config.ts              Validation de l'URL publique
+  proxy.ts                 CSP à nonce
+supabase/migrations/        Schéma initial puis migration chat/bots
+tests/                      Moteur, contrat HTTP, géométrie et conventions
+tests/integration/          Permissions réelles et concurrence Supabase
+scripts/check-config.mjs    Diagnostic sans afficher clés ni données de parties
+docs/                      Architecture, règles, sécurité, déploiement et tests
+AGENTS.md                  Instructions de contribution
 ```
 
-Le navigateur envoie une **intention** ; le serveur authentifie le joueur, relit la partie, vérifie les règles, puis enregistre l’état avec une comparaison de version atomique. Il renvoie uniquement la projection du joueur. Realtime transmet `{room_code, version}` : jamais de pioche ni de main.
+Le navigateur envoie une intention. Le serveur vérifie identité, appartenance, tour, cartes et règles. Il sauvegarde avec une comparaison atomique de version, puis renvoie la projection du joueur. Realtime ne publie que code, version et compteur de chat, jamais les mains, la pioche ou les messages.
 
-## Mise en ligne
+## Configuration
 
-Suivre [le guide de déploiement](docs/DEPLOYMENT.md), de la création du projet Supabase jusqu’à la recette Vercel. Copier `.env.example` vers `.env.local` pour le développement connecté. **Ne jamais committer les clés**, ni utiliser un préfixe `NEXT_PUBLIC_` pour la clé `service_role`.
+Pour une première installation, suivre [DEPLOYMENT.md](docs/DEPLOYMENT.md). Pour le site existant, suivre [UPGRADE.md](docs/UPGRADE.md). Les deux migrations sont nécessaires, dans l'ordre ; ne pas réexécuter la première si elle est déjà appliquée.
 
-| Variable                         | Où ?              | Usage                                                        |
-| -------------------------------- | ----------------- | ------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`       | Client + serveur  | URL du projet                                                |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`  | Client            | Clé publique publishable ou anon                             |
-| `SUPABASE_SERVICE_ROLE_KEY`      | Serveur seulement | Accès aux états privés et RPC                                |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Client            | Widget CAPTCHA ; requis en production                        |
-| `APP_ORIGIN`                     | Serveur           | Origine exacte autorisée, sans slash final                   |
-| `RATE_LIMIT_SECRET`              | Serveur           | Secret aléatoire d’au moins 32 caractères pour hacher les IP |
+Copier `.env.example` vers `.env.local` seulement si le fichier local n'existe pas. Ne jamais placer des secrets dans le fichier d'exemple, même temporairement.
 
-La clé **secrète Turnstile** se configure dans Supabase Auth, pas dans le navigateur ni ce dépôt. Un fichier de configuration incomplet désactive le multijoueur avec une erreur explicite ; le jeu local reste utilisable.
+| Variable                         | Usage                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`       | Project URL, `https://<référence>.supabase.co`, pas le dashboard       |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`  | Clé publique du projet                                                 |
+| `SUPABASE_SERVICE_ROLE_KEY`      | Clé serveur uniquement                                                 |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Site key publique du CAPTCHA                                           |
+| `APP_ORIGIN`                     | Origine exacte : locale en développement, domaine Vercel en production |
+| `RATE_LIMIT_SECRET`              | Secret aléatoire d'au moins 32 caractères pour le HMAC des quotas      |
 
-## Qualité et sécurité
+Le secret Turnstile se renseigne dans Supabase Auth. Activer les connexions anonymes **et** autoriser les nouvelles inscriptions. Vérifier le domaine autorisé dans Turnstile. Redéployer après une modification des variables publiques.
+
+## Vérifications
 
 ```sh
-npm run test             # Moteur, scénarios et contrats HTTP
-npm run typecheck        # TypeScript strict
-npm run check            # Tests + types
-npm run build            # Build de production
-npm audit               # Vérification des avis de sécurité npm
+npm run check
+npm run build
+npm run format:check
+npm audit --audit-level=high
 ```
 
-Voir [SECURITY.md](docs/SECURITY.md) et [TESTING.md](docs/TESTING.md). Une architecture restrictive ne constitue pas une garantie d’absence de vulnérabilités. Le CAPTCHA Supabase, les limites de la plateforme, les secrets et les politiques SQL font partie du déploiement, pas d’une simple option esthétique.
+Diagnostic de configuration en lecture seule : `node --env-file=.env.local scripts/check-config.mjs`. Les tests d'intégration décrits dans [TESTING.md](docs/TESTING.md) doivent être exécutés sur un Supabase de test, pas automatiquement sur la production.
 
-## Périmètre et limites
+## Limites
 
-- TAC-TIK de base uniquement ; pas de variante TOCK, cartes 13/Joker ou extension à 8.
-- Pas de matchmaking public, chat, spectateurs, expulsion, remplacement d’un joueur, compte permanent ou abandon automatique. Un joueur parti peut revenir avec sa session ; sinon il faut ouvrir une autre table.
-- Les parties expirent 7 jours après leur création. La purge SQL doit être planifiée (guide fourni).
-- Le code d’invitation permet d’entrer tant que le salon est ouvert. Il doit rester entre les participants ; ce n’est pas un mécanisme d’approbation individuelle par l’hôte.
-- La session anonyme est liée au stockage du navigateur : la supprimer fait perdre l’accès à la place. Les données d’une partie ne sont jamais récupérables avec le seul pseudo.
-- La photo mentionne 49 cartes, le PDF décrit un paquet TAC-TIK de 48. Cette version suit le PDF ; la répartition uniforme des 12 types de cartes est une hypothèse documentée à confirmer sur le paquet physique.
-- Le plateau conserve le parcours de 16 cases par couleur mais adopte une disposition elliptique pour la lisibilité. Il ne reproduit pas exactement la découpe en panneaux du plateau physique.
+- Pas de TOCK ni carte 13. Les 12 cartes ordinaires sont présentes en quatre exemplaires par paquet ; le Joker supplémentaire a été confirmé par le propriétaire.
+- Pas de matchmaking public, spectateurs, expulsion ou remplacement en cours de partie.
+- Les bots en ligne avancent tant qu'un membre est connecté. Ils reprennent au retour des joueurs, sans processus permanent Vercel.
+- La session anonyme appartient au navigateur. Effacer son stockage fait perdre sa place ; le pseudo ne sert jamais de preuve d'identité.
+- Les salons expirent sept jours après création ; planifier la purge décrite dans le guide. Les messages sont supprimés avec le salon.
+- Le mode solo est réinitialisé par une actualisation.
+- La disposition à 8 prolonge le panneau central selon la logique du plateau. Aucune photo de l'extension à 8 n'a été fournie.
 
-Les références fournies par l’utilisateur restent hors du code distribué. Les visuels sont réalisés en CSS/SVG. Cette adaptation indépendante n’est pas présentée comme un produit officiel de l’éditeur.
+Le code et les visuels sont une adaptation indépendante. Lire [SECURITY.md](docs/SECURITY.md) pour les protections et limites. Aucun résultat de test local ne remplace la vérification du CAPTCHA et des permissions du déploiement réel.

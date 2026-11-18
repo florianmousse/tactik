@@ -1,11 +1,19 @@
 'use client';
-import { colorOrder, startPosition, trackLength } from '@/game/engine';
+import { colorOrder, trackLength } from '@/game/engine';
+import { boardLayout } from '@/game/board-layout';
 import type { View } from '@/game/types';
-export const PALETTE = ['#d35e49', '#d6a02d', '#447dba', '#398474', '#55556b', '#e9e3d2'];
-export const COLOR_NAMES = ['Corail', 'Miel', 'Azur', 'Sauge', 'Ardoise', 'Ivoire'];
-function point(angle: number, radius: number): [number, number] {
-  return [400 + Math.cos(angle) * radius, 350 + Math.sin(angle) * radius * 0.84];
-}
+import { cardSymbol, COLOR_NAMES } from '@/game/labels';
+export { COLOR_NAMES } from '@/game/labels';
+export const PALETTE = [
+  '#c7372d',
+  '#e9bd20',
+  '#205eb3',
+  '#16805b',
+  '#292b2c',
+  '#f2eee1',
+  '#8d4baf',
+  '#e98028',
+];
 export function Board({
   game,
   selected,
@@ -17,138 +25,156 @@ export function Board({
   playable: string[];
   onPiece: (id: string) => void;
 }) {
-  const length = trackLength(game),
-    order = colorOrder(game),
-    angle = (pos: number) => (pos / length) * Math.PI * 2 + Math.PI / 2;
-  const coordinates = (color: number, pos: number, number: number): [number, number] => {
-    const a = angle(startPosition(game, color));
-    if (pos === -1) {
-      const [x, y] = point(a, 360);
-      return [
-        x + Math.cos(a + Math.PI / 2) * (number - 1.5) * 21,
-        y + Math.sin(a + Math.PI / 2) * (number - 1.5) * 21,
-      ];
-    }
-    if (pos >= length) return point(a + 0.13, 265 - (pos - length) * 28);
-    return point(angle(pos), 310);
-  };
+  const layout = boardLayout(game),
+    length = trackLength(game),
+    order = colorOrder(game);
   return (
     <svg
       className="board"
-      viewBox="0 0 800 700"
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
       role="group"
-      aria-label="Plateau TAC-TIK, parcours et maisons"
+      aria-label={`Plateau TAC-TIK ${order.length} couleurs, ${length} cases`}
     >
       <defs>
-        <pattern id="wood" width="160" height="12" patternUnits="userSpaceOnUse">
+        <linearGradient id="timber" x2=".8" y2="1">
+          <stop stopColor="#e4c795" />
+          <stop offset=".45" stopColor="#f2dbb1" />
+          <stop offset="1" stopColor="#d9b982" />
+        </linearGradient>
+        <pattern id="grain" width="79" height="200" patternUnits="userSpaceOnUse">
           <path
-            d="M0 3 Q50 7 160 3 M0 10 Q90 6 160 10"
+            d="M3 -20 Q18 50 5 130 T8 220 M21 -20 Q9 70 25 170 T23 240 M43 -20 Q57 90 41 180 T44 220 M65 -20 Q53 50 69 140 T67 220"
             fill="none"
-            stroke="#9e7547"
-            strokeOpacity=".075"
+            stroke="#8c6536"
+            strokeOpacity=".12"
           />
+          <path d="M12 20v25m20 46v50m18-100v27m22 62v42" stroke="#866236" strokeOpacity=".2" />
         </pattern>
-        <filter id="shadow">
-          <feDropShadow dx="0" dy="3" stdDeviation="2" floodOpacity=".25" />
-        </filter>
-        <radialGradient id="timber">
-          <stop stopColor="#f4dfb9" />
-          <stop offset="1" stopColor="#dbc092" />
+        <radialGradient id="hole">
+          <stop stopColor="#57402b" />
+          <stop offset=".7" stopColor="#88653f" />
+          <stop offset="1" stopColor="#af8a58" />
         </radialGradient>
+        <filter id="peg-shadow">
+          <feDropShadow dx="1" dy="3" stdDeviation="1.5" floodOpacity=".25" />
+        </filter>
       </defs>
       <rect
-        x="8"
-        y="8"
-        width="784"
-        height="684"
-        rx="44"
+        x="3"
+        y="3"
+        width={layout.width - 6}
+        height="594"
+        rx="4"
         fill="url(#timber)"
-        stroke="#b79b72"
-        strokeWidth="2"
+        stroke="#b38f5e"
+        strokeWidth="3"
       />
-      <rect x="8" y="8" width="784" height="684" rx="44" fill="url(#wood)" />
-      <rect
-        x="22"
-        y="22"
-        width="756"
-        height="656"
-        rx="33"
-        fill="none"
-        stroke="#99794e"
-        strokeOpacity=".25"
-      />
-      <ellipse
-        cx="400"
-        cy="350"
-        rx="310"
-        ry="260.4"
-        fill="none"
-        stroke="#987345"
-        strokeOpacity=".13"
-        strokeWidth="2"
-      />
-      {Array.from({ length }, (_, pos) => {
-        const [x, y] = coordinates(0, pos, 0);
-        const start = order.find((c) => startPosition(game, c) === pos);
+      <rect x="3" y="3" width={layout.width - 6} height="594" rx="4" fill="url(#grain)" />
+      {layout.seams.map((x) => (
+        <path key={x} d={`M${x} 4V596`} stroke="#715536" strokeOpacity=".25" strokeWidth="2" />
+      ))}
+      {layout.track.map(([x, y], i) => (
+        <g key={i}>
+          <circle cx={x} cy={y} r="10" fill="url(#hole)" stroke="#f6e4c7" strokeWidth="1.4" />
+          {i % 4 === 0 && (
+            <circle
+              cx={x}
+              cy={y}
+              r="14.5"
+              fill="none"
+              stroke={i % 16 === 0 ? PALETTE[order[i / 16]] : '#382e22'}
+              strokeWidth={i % 16 === 0 ? 4 : 2}
+            />
+          )}
+        </g>
+      ))}
+      {order.map((c) => {
+        const home = layout.homes[c],
+          reserve = layout.reserves[c];
+        const minX = Math.min(...reserve.map((p) => p[0])),
+          minY = Math.min(...reserve.map((p) => p[1]));
+        const horizontal = reserve[0][1] === reserve[1][1];
         return (
-          <g key={pos}>
-            <circle cx={x} cy={y} r="7" fill="#80633e" fillOpacity=".55" />
-            {pos % 4 === 0 && (
+          <g key={c}>
+            <path
+              d={`M${home.map((p) => p.join(',')).join(' L')}`}
+              stroke={PALETTE[c]}
+              strokeWidth="27"
+              strokeLinecap="round"
+              fill="none"
+            />
+            {home.map(([x, y], i) => (
               <circle
+                key={i}
                 cx={x}
                 cy={y}
-                r="10"
-                fill="none"
-                stroke={start === undefined ? '#80633e' : PALETTE[start]}
-                strokeWidth={start === undefined ? 1 : 3}
+                r="9.5"
+                fill="url(#hole)"
+                stroke="#f5dcac"
+                strokeWidth="1"
               />
-            )}
+            ))}
+            <rect
+              x={minX - 18}
+              y={minY - 19}
+              width={horizontal ? 96 : 36}
+              height={horizontal ? 38 : 98}
+              rx="12"
+              fill="#342e24"
+              stroke={PALETTE[c]}
+              strokeWidth="5"
+            />
           </g>
         );
       })}
-      {order.map((c) => (
-        <g key={c}>
-          {Array.from({ length: 4 }, (_, n) => {
-            const [x, y] = coordinates(c, length + n, n),
-              [rx, ry] = coordinates(c, -1, n);
-            return (
-              <g key={n}>
-                <circle cx={x} cy={y} r="10" fill={PALETTE[c]} opacity=".28" />
-                <circle cx={x} cy={y} r="6" fill="#80633e" fillOpacity=".5" />
-                <rect
-                  x={rx - 8}
-                  y={ry - 14}
-                  width="16"
-                  height="28"
-                  rx="6"
-                  fill={PALETTE[c]}
-                  opacity=".18"
-                />
-              </g>
-            );
-          })}
-        </g>
-      ))}
-      <text x="400" y="326" textAnchor="middle" className="board-word">
-        TAC<tspan fill="#bd6d42">✳</tspan>TIK
+      <text
+        x={layout.width / 2}
+        y="254"
+        textAnchor="middle"
+        fontFamily="Georgia,serif"
+        fontSize="26"
+        fill="#493a25"
+        letterSpacing="3"
+      >
+        TAC✳TIK
       </text>
-      <text x="400" y="355" textAnchor="middle" className="board-caption">
-        UN PEU DE CHANCE. BEAUCOUP DE MALICE.
-      </text>
-      <path d="M365 379 H435" stroke="#9a7b53" strokeOpacity=".5" />
-      <text x="400" y="405" textAnchor="middle" className="board-caption">
-        {length} CASES · {order.length} COULEURS
-      </text>
+      <g transform={`translate(${layout.width / 2 - 43},275)`}>
+        <rect width="40" height="64" rx="5" fill="#263e34" stroke="#f0e4c8" strokeWidth="3" />
+        <text x="20" y="38" textAnchor="middle" fill="#e6d5ad" fontSize="18">
+          ✳
+        </text>
+      </g>
+      <g transform={`translate(${layout.width / 2 + 8},275)`}>
+        <rect width="40" height="64" rx="5" fill="#fbf4e6" stroke="#a48d65" />
+        <text
+          x="20"
+          y="38"
+          textAnchor="middle"
+          fill="#493b29"
+          fontFamily="Georgia,serif"
+          fontSize="21"
+        >
+          {game.discard.length ? cardSymbol(game.discard.at(-1)!) : ''}
+        </text>
+      </g>
       {game.pieces.map((p) => {
-        const [x, y] = coordinates(p.color, p.position, Number(p.id.split('-')[1]));
-        const enabled = playable.includes(p.id);
+        const n = Number(p.id.split('-')[1]);
+        const [x, y] =
+          p.position < 0
+            ? layout.reserves[p.color][n]
+            : p.position >= length
+              ? layout.homes[p.color][p.position - length]
+              : layout.track[p.position];
+        const enabled = playable.includes(p.id),
+          horizontal =
+            p.position < 0 && layout.reserves[p.color][0][0] === layout.reserves[p.color][1][0];
         return (
           <g
             key={p.id}
             role="button"
             tabIndex={enabled ? 0 : -1}
             aria-disabled={!enabled}
-            aria-label={`${COLOR_NAMES[p.color]} ${Number(p.id.split('-')[1]) + 1}, ${p.position === -1 ? 'réserve' : p.position >= length ? 'maison' : p.stake ? 'pieu' : 'parcours'}`}
+            aria-label={`${COLOR_NAMES[p.color]} ${n + 1}, ${p.position < 0 ? 'réserve' : p.position >= length ? 'maison' : p.stake ? 'pieu' : 'parcours'}`}
             onClick={() => enabled && onPiece(p.id)}
             onKeyDown={(e) => {
               if (enabled && (e.key === 'Enter' || e.key === ' ')) {
@@ -156,42 +182,35 @@ export function Board({
                 onPiece(p.id);
               }
             }}
-            className={enabled ? 'piece playable' : 'piece'}
+            className={enabled ? 'peg selectable' : 'peg'}
           >
             {(enabled || selected === p.id) && (
               <circle
                 cx={x}
                 cy={y}
-                r="17"
-                fill="none"
-                stroke={selected === p.id ? '#fdfbf6' : '#224c40'}
-                strokeWidth="2.5"
+                r="19"
+                fill="#fff9"
+                stroke="#184a77"
+                strokeWidth="2"
                 strokeDasharray={selected === p.id ? undefined : '3 3'}
               />
             )}
-            <rect
-              x={x - 8}
-              y={y - 12}
-              width="16"
-              height="24"
-              rx="6"
-              fill={PALETTE[p.color]}
-              stroke="#302b24"
-              strokeOpacity=".25"
-              filter="url(#shadow)"
-            />
-            <ellipse
-              cx={x}
-              cy={y - 7}
-              rx="5"
-              ry="3"
-              fill={p.stake ? '#28241f' : '#fff'}
-              opacity={p.stake ? 0.8 : 0.3}
-            />
-            <title>
-              {COLOR_NAMES[p.color]} {Number(p.id.split('-')[1]) + 1}
-              {p.stake ? ' • Pieu protégé' : ''}
-            </title>
+            <g
+              transform={`translate(${x},${y}) rotate(${horizontal ? 90 : 0})`}
+              filter="url(#peg-shadow)"
+            >
+              <rect
+                x="-8"
+                y="-13"
+                width="16"
+                height="26"
+                rx="5"
+                fill={PALETTE[p.color]}
+                stroke="#2228"
+              />
+              <ellipse cy="-8" rx="7" ry="4" fill={PALETTE[p.color]} stroke="#fff5" />
+              {p.stake && <ellipse cy="-8" rx="3.5" ry="2.3" fill="#1e1b16" />}
+            </g>
           </g>
         );
       })}

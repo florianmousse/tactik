@@ -1,6 +1,8 @@
 import {
   CARDS,
   type Card,
+  type BaseCard,
+  type Person,
   type Game,
   type Move,
   type Piece,
@@ -22,17 +24,25 @@ export function shuffle<T>(items: T[], random: () => number): T[] {
   return result;
 }
 export const colorCount = (g: Pick<Game, 'players'>) =>
-  g.players.length === 2 || g.players.length === 4 ? 4 : 6;
+  g.players.length === 8 ? 8 : g.players.length === 2 || g.players.length === 4 ? 4 : 6;
 export const trackLength = (g: Pick<Game, 'players'>) => colorCount(g) * 16;
 // Clockwise seating: opposing partners. Color IDs are stable for the visual palette.
 export const colorOrder = (g: Pick<Game, 'players'>) =>
-  colorCount(g) === 4 ? [0, 2, 1, 3] : [0, 4, 2, 1, 5, 3];
+  colorCount(g) === 4
+    ? [0, 2, 1, 3]
+    : colorCount(g) === 8
+      ? [0, 4, 5, 2, 1, 6, 7, 3]
+      : [0, 4, 2, 1, 5, 3];
 export const startPosition = (g: Pick<Game, 'players'>, color: number) =>
   colorOrder(g).indexOf(color) * 16;
-export function createGame(people: { id: string; name: string }[], random: () => number): Game {
-  requireRule([2, 3, 4, 6].includes(people.length), 'Choisir 2, 3, 4 ou 6 joueurs.');
+export function createGame(
+  people: Person[],
+  random: () => number,
+  options: { jokers?: boolean } = {},
+): Game {
+  requireRule([2, 3, 4, 6, 8].includes(people.length), 'Choisir 2, 3, 4, 6 ou 8 joueurs.');
   requireRule(new Set(people.map((p) => p.id)).size === people.length, 'Joueurs dupliqués.');
-  const order = people.length === 2 || people.length === 4 ? [0, 2, 1, 3] : [0, 4, 2, 1, 5, 3];
+  const order = colorOrder({ players: people as Player[] });
   const players: Player[] = people.map((p, i) => ({
     ...p,
     colors:
@@ -57,7 +67,10 @@ export function createGame(people: { id: string; name: string }[], random: () =>
     ),
     hands: people.map(() => []),
     deck: shuffle(
-      CARDS.flatMap((c) => [c, c, c, c]),
+      Array.from({ length: people.length === 8 ? 2 : 1 }, () => [
+        ...CARDS.flatMap((c) => [c, c, c, c]),
+        ...(options.jokers ? ['joker' as const] : []),
+      ]).flat(),
       random,
     ),
     discard: [],
@@ -68,6 +81,7 @@ export function createGame(people: { id: string; name: string }[], random: () =>
     winner: null,
     log: ['La partie commence. Échangez une carte.'],
     round: 0,
+    jokers: options.jokers ?? false,
   };
   deal(g, random);
   return g;
@@ -194,7 +208,7 @@ function execute(g: Game, actor: number, move: Move, eatPath: boolean): void {
 function candidates(
   g: Game,
   actor: number,
-  card: Card,
+  card: BaseCard,
   used: string[] = [],
   remaining = 7,
   color?: number,
@@ -234,54 +248,64 @@ export function legalPlays(g: Game, actor: number, onlyFirst = false): Play[] {
   if (g.phase !== 'play' || g.turn !== actor) return [];
   const output: Play[] = [];
   for (let index = 0; index < g.hands[actor].length; index++) {
-    const card = g.hands[actor][index];
-    if (card !== 7) {
-      for (const move of candidates(g, actor, card)) {
-        output.push({ cardIndex: index, moves: [move] });
-        if (onlyFirst) return output;
-      }
-    } else {
-      const visit = (state: Game, moves: Move[], remaining: number, color?: number): boolean => {
-        if (!remaining) {
-          output.push({ cardIndex: index, moves });
-          return onlyFirst;
+    const printed = g.hands[actor][index];
+    for (const card of printed === 'joker' ? CARDS : [printed]) {
+      const identity = printed === 'joker' ? { as: card } : {};
+      if (card !== 7) {
+        for (const move of candidates(g, actor, card)) {
+          output.push({ cardIndex: index, moves: [move], ...identity });
+          if (onlyFirst) return output;
         }
-        for (const m of candidates(
-          state,
-          actor,
-          7,
-          moves.map((m) => m.piece),
-          remaining,
-          color,
-        )) {
-          if (m.kind !== 'move') continue;
-          const next = structuredClone(state);
-          execute(next, actor, m, true);
-          if (
-            visit(
-              next,
-              [...moves, m],
-              remaining - m.steps,
-              color ?? state.pieces.find((p) => p.id === m.piece)!.color,
+      } else {
+        const visit = (state: Game, moves: Move[], remaining: number, color?: number): boolean => {
+          if (!remaining) {
+            output.push({ cardIndex: index, moves, ...identity });
+            return onlyFirst;
+          }
+          for (const m of candidates(
+            state,
+            actor,
+            7,
+            moves.map((m) => m.piece),
+            remaining,
+            color,
+          )) {
+            if (m.kind !== 'move') continue;
+            const next = structuredClone(state);
+            execute(next, actor, m, true);
+            if (
+              visit(
+                next,
+                [...moves, m],
+                remaining - m.steps,
+                color ?? state.pieces.find((p) => p.id === m.piece)!.color,
+              )
             )
-          )
-            return true;
-        }
-        return false;
-      };
-      if (visit(g, [], 7)) return output;
+              return true;
+          }
+          return false;
+        };
+        if (visit(g, [], 7)) return output;
+      }
     }
   }
   return output;
 }
 export function play(given: Game, actor: number, action: Play, random: () => number): Game {
-  requireRule(given.phase === 'play' && given.turn === actor, 'Ce n’est pas votre tour.');
+  requireRule(given.phase === 'play' && given.turn === actor, "Ce n'est pas votre tour.");
   const g = structuredClone(given),
-    card = g.hands[actor][action.cardIndex];
+    printed = g.hands[actor][action.cardIndex];
   requireRule(
-    card !== undefined && Number.isInteger(action.cardIndex) && action.cardIndex >= 0,
+    printed !== undefined && Number.isInteger(action.cardIndex) && action.cardIndex >= 0,
     'Carte inconnue.',
   );
+  requireRule(
+    printed === 'joker'
+      ? action.moves.length === 0 || CARDS.includes(action.as!)
+      : action.as === undefined,
+    'Valeur du Joker invalide.',
+  );
+  const card = printed === 'joker' ? action.as : printed;
   if (!action.moves.length)
     requireRule(
       legalPlays(g, actor, true).length === 0,
@@ -326,9 +350,9 @@ export function play(given: Game, actor: number, action: Play, random: () => num
     }
   }
   g.hands[actor].splice(action.cardIndex, 1);
-  g.discard.push(card);
+  g.discard.push(printed);
   g.log.unshift(
-    `${g.players[actor].name} ${action.moves.length ? 'joue' : 'défausse'} ${card === 'swap' ? 'Permutation' : card}.`,
+    `${g.players[actor].name} ${action.moves.length ? 'joue' : 'défausse'} ${printed === 'joker' ? `Joker${card === undefined ? '' : ` (${card})`}` : card === 'swap' ? 'Permutation' : card}.`,
   );
   g.log = g.log.slice(0, 30);
   const team = g.players[actor].team,
@@ -339,7 +363,11 @@ export function play(given: Game, actor: number, action: Play, random: () => num
     g.phase = 'finished';
     g.winner = team;
     g.log.unshift('La partie est terminée !');
-  } else if (g.hands.every((h) => !h.length)) {
+  } else advanceTurn(g, random);
+  return g;
+}
+function advanceTurn(g: Game, random: () => number) {
+  if (g.hands.every((h) => !h.length)) {
     g.dealer = (g.dealer + 1) % g.players.length;
     deal(g, random);
   } else {
@@ -347,6 +375,24 @@ export function play(given: Game, actor: number, action: Play, random: () => num
       g.turn = (g.turn + 1) % g.players.length;
     } while (!g.hands[g.turn].length);
   }
+}
+// House rule requested by the owner: never for a temporary blockage on the track.
+export function canDiscardHand(g: Game, actor: number): boolean {
+  if (g.phase !== 'play' || g.turn !== actor || !g.hands[actor]?.length) return false;
+  const colors = activeColors(g, actor);
+  return (
+    g.pieces.filter((p) => colors.includes(p.color)).every((p) => p.position === -1) &&
+    !g.hands[actor].some((c) => c === 1 || c === 10 || c === 'joker')
+  );
+}
+export function discardHand(given: Game, actor: number, random: () => number): Game {
+  requireRule(canDiscardHand(given, actor), 'La main ne peut pas être défaussée entièrement.');
+  const g = structuredClone(given);
+  g.discard.push(...g.hands[actor]);
+  g.hands[actor] = [];
+  g.log.unshift(`${g.players[actor].name} défausse sa main.`);
+  g.log = g.log.slice(0, 30);
+  advanceTurn(g, random);
   return g;
 }
 export function viewFor(g: Game, id: string): View {
@@ -361,5 +407,6 @@ export function viewFor(g: Game, id: string): View {
     deckCount: deck.length,
     me,
     options: legalPlays(g, me),
+    canDiscardHand: canDiscardHand(g, me),
   };
 }

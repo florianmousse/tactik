@@ -1,15 +1,27 @@
-export const COLORS = ['coral', 'gold', 'blue', 'green', 'ink', 'ivory'] as const;
+export const COLORS = [
+  'red',
+  'yellow',
+  'blue',
+  'green',
+  'black',
+  'white',
+  'purple',
+  'orange',
+] as const;
 export type Color = (typeof COLORS)[number];
-export type Card = 1 | 2 | 3 | 5 | 6 | 8 | 9 | 10 | 12 | -4 | 7 | 'swap';
-export const CARDS: Card[] = [1, 2, 3, -4, 5, 6, 7, 8, 9, 10, 'swap', 12];
+export type BaseCard = 1 | 2 | 3 | 5 | 6 | 8 | 9 | 10 | 12 | -4 | 7 | 'swap';
+export type Card = BaseCard | 'joker';
+export const CARDS: BaseCard[] = [1, 2, 3, -4, 5, 6, 7, 8, 9, 10, 'swap', 12];
+export type Capacity = 2 | 3 | 4 | 6 | 8;
+export type Person = { id: string; name: string; bot?: boolean };
 export type Piece = { id: string; color: number; position: number; stake: boolean };
 // position: -1 reserve, 0..trackLength-1 track, trackLength..trackLength+3 home.
-export type Player = { id: string; name: string; colors: number[]; team: number };
+export type Player = Person & { colors: number[]; team: number };
 export type Move =
   | { kind: 'start'; piece: string }
   | { kind: 'move'; piece: string; steps: number; home?: boolean }
   | { kind: 'swap'; piece: string; target: string };
-export type Play = { cardIndex: number; moves: Move[] };
+export type Play = { cardIndex: number; moves: Move[]; as?: BaseCard };
 export type Game = {
   players: Player[];
   pieces: Piece[];
@@ -23,6 +35,7 @@ export type Game = {
   winner: number | null;
   log: string[];
   round: number;
+  jokers?: boolean;
 };
 export type View = Omit<Game, 'hands' | 'deck' | 'exchanges'> & {
   hand: Card[];
@@ -31,4 +44,5 @@ export type View = Omit<Game, 'hands' | 'deck' | 'exchanges'> & {
   deckCount: number;
   me: number;
   options: Play[];
+  canDiscardHand: boolean;
 };

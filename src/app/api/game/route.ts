@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { commandSchema } from '@/server/schema';
 import { admin, dispatch, HttpError, limit } from '@/server/store';
+import { configuredOrigin } from '@/server/origin';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
@@ -8,10 +9,13 @@ export async function POST(request: Request) {
   const headers = { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Origin' };
   try {
     const expected =
-      process.env.APP_ORIGIN ||
+      configuredOrigin(process.env.APP_ORIGIN) ||
       (process.env.NODE_ENV !== 'production' ? new URL(request.url).origin : '');
     if (!expected || request.headers.get('origin') !== expected)
-      throw new HttpError(403, 'Origine refusée.');
+      throw new HttpError(
+        403,
+        'Origine refusée. APP_ORIGIN doit correspondre au domaine utilisé, puis le site doit être redéployé.',
+      );
     if (!request.headers.get('content-type')?.startsWith('application/json'))
       throw new HttpError(415, 'Format JSON requis.');
     const db = admin();

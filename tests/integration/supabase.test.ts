@@ -51,6 +51,18 @@ test(
         null,
       );
       for (const client of [anon, ...users]) {
+        assert.ok((await client.from('room_messages').select('*').eq('room_code', code)).error);
+        assert.ok(
+          (
+            await client.rpc('append_room_message', {
+              p_code: code,
+              p_user: ids[0],
+              p_id: randomUUID(),
+              p_name: 'Test',
+              p_text: 'Message',
+            })
+          ).error,
+        );
         assert.ok(
           (await client.from('game_rooms').select('*').eq('code', code)).error,
           'Un client ne doit pas lire game_rooms.',
@@ -93,6 +105,41 @@ test(
         (await admin.from('game_rooms').select('version').eq('code', code).single()).data?.version,
         1,
       );
+      const message = {
+        p_code: code,
+        p_user: ids[0],
+        p_id: randomUUID(),
+        p_name: 'Test',
+        p_text: '<b>Texte</b>',
+      };
+      assert.ok((await admin.rpc('append_room_message', { ...message, p_user: ids[1] })).error);
+      for (let retry = 0; retry < 2; retry++) {
+        assert.equal((await admin.rpc('append_room_message', message)).error, null);
+      }
+      const messages = await admin.from('room_messages').select('text').eq('room_code', code);
+      assert.equal(messages.error, null);
+      assert.deepEqual(messages.data, [{ text: message.p_text }]);
+      const signal = await users[0]
+        .from('room_events')
+        .select('version,chat_revision')
+        .eq('room_code', code)
+        .single();
+      assert.equal(signal.error, null);
+      assert.deepEqual(signal.data, { version: 1, chat_revision: 1 });
+      const botState = {
+        ...state,
+        people: [...state.people, { id: `bot:${randomUUID()}`, name: 'Bot', bot: true }],
+      };
+      const botCommit = await admin.rpc('commit_game_room', {
+        p_code: code,
+        p_version: 1,
+        p_state: botState,
+      });
+      assert.equal(botCommit.error, null);
+      assert.equal(botCommit.data, true);
+      const members = await admin.from('room_members').select('user_id').eq('room_code', code);
+      assert.equal(members.error, null);
+      assert.deepEqual(members.data, [{ user_id: ids[0] }]);
       const limits = await Promise.all(
         Array.from({ length: 5 }, () =>
           admin.rpc('consume_rate_limit', { p_key: rateKey, p_max: 2, p_seconds: 60 }),

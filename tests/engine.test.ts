@@ -236,7 +236,7 @@ test('défausse autorisée seulement quand aucune carte ne permet de jouer', () 
   const next = play(g, 0, { cardIndex: 0, moves: [] }, random);
   assert.equal(next.discard.at(-1), 3);
 });
-test('aide au partenaire et victoire de toute l’équipe', () => {
+test("aide au partenaire et victoire de toute l'équipe", () => {
   const g = setup();
   const length = trackLength(g);
   g.pieces
@@ -261,7 +261,7 @@ test('aide au partenaire et victoire de toute l’équipe', () => {
   assert.equal(next.phase, 'finished');
   assert.equal(next.winner, 0);
 });
-test('projection privée : ni pioche, ni mains adverses, ni choix d’échange', () => {
+test("projection privée : ni pioche, ni mains adverses, ni choix d'échange", () => {
   const g = setup();
   const view = viewFor(g, 'p0');
   assert.equal('hands' in view, false);
