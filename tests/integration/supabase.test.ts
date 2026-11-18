@@ -1,0 +1,110 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
+
+test(
+  'Supabase réel : isolation RLS, RPC privées, CAS concurrent et quotas atomiques',
+  { skip: process.env.RUN_SUPABASE_INTEGRATION !== '1', timeout: 60000 },
+  async () => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      publicKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      secret = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    assert.ok(
+      url && publicKey && secret,
+      'Variables Supabase nécessaires (projet de test uniquement).',
+    );
+    const options = { auth: { autoRefreshToken: false, persistSession: false } };
+    const admin = createClient(url, secret, options),
+      anon = createClient(url, publicKey, options);
+    const ids: string[] = [],
+      code = randomBytes(6).toString('hex').toUpperCase(),
+      rateKey = `integration-${randomUUID()}`;
+    try {
+      const users = [];
+      for (let i = 0; i < 2; i++) {
+        const email = `taktik-test-${randomUUID()}@example.com`,
+          password = randomBytes(32).toString('hex');
+        const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+        assert.equal(created.error, null);
+        ids.push(created.data.user!.id);
+        // Admin-generated magic link yields a one-time token without sending email.
+        const link = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+        assert.equal(link.error, null);
+        const client = createClient(url, publicKey, options);
+        const login = await client.auth.verifyOtp({
+          token_hash: link.data.properties!.hashed_token,
+          type: 'magiclink',
+        });
+        assert.equal(login.error, null);
+        users.push(client);
+      }
+      const state = {
+        host: ids[0],
+        capacity: 2,
+        people: [{ id: ids[0], name: 'Test' }],
+        game: null,
+      };
+      assert.equal(
+        (await admin.rpc('create_game_room', { p_code: code, p_state: state, p_user: ids[0] }))
+          .error,
+        null,
+      );
+      for (const client of [anon, ...users]) {
+        assert.ok(
+          (await client.from('game_rooms').select('*').eq('code', code)).error,
+          'Un client ne doit pas lire game_rooms.',
+        );
+        assert.ok(
+          (await client.rpc('commit_game_room', { p_code: code, p_version: 0, p_state: state }))
+            .error,
+          'RPC accessible au client.',
+        );
+        assert.ok(
+          (await client.rpc('create_game_room', { p_code: code, p_state: state, p_user: ids[0] }))
+            .error,
+        );
+        assert.ok(
+          (await client.rpc('consume_rate_limit', { p_key: rateKey, p_max: 2, p_seconds: 60 }))
+            .error,
+        );
+      }
+      const own = await users[0].from('room_events').select('*').eq('room_code', code);
+      assert.equal(own.error, null);
+      assert.equal(own.data?.length, 1);
+      const other = await users[1].from('room_events').select('*').eq('room_code', code);
+      assert.equal(other.error, null);
+      assert.deepEqual(other.data, []);
+      assert.deepEqual(
+        (await users[1].from('room_members').select('*').eq('room_code', code)).data,
+        [],
+      );
+      assert.ok(
+        (await users[0].from('room_events').update({ version: 100 }).eq('room_code', code)).error,
+      );
+      const results = await Promise.all(
+        [0, 1].map(() =>
+          admin.rpc('commit_game_room', { p_code: code, p_version: 0, p_state: state }),
+        ),
+      );
+      assert.ok(results.every((r) => !r.error));
+      assert.equal(results.filter((r) => r.data === true).length, 1);
+      assert.equal(
+        (await admin.from('game_rooms').select('version').eq('code', code).single()).data?.version,
+        1,
+      );
+      const limits = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          admin.rpc('consume_rate_limit', { p_key: rateKey, p_max: 2, p_seconds: 60 }),
+        ),
+      );
+      assert.ok(limits.every((r) => !r.error));
+      assert.equal(limits.filter((r) => r.data === true).length, 2);
+    } finally {
+      // Only exact temporary keys/UUIDs created by this invocation are removed.
+      assert.equal((await admin.from('game_rooms').delete().eq('code', code)).error, null);
+      assert.equal((await admin.from('rate_limits').delete().eq('key', rateKey)).error, null);
+      for (const id of ids) assert.equal((await admin.auth.admin.deleteUser(id)).error, null);
+    }
+  },
+);
