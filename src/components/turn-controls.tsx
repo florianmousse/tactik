@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { CARDS, type BaseCard, type Move, type Play, type View } from '@/game/types';
 import { cardSymbol, cardTitle, moveLabel, COLOR_NAMES } from '@/game/labels';
 import { PALETTE } from './board';
@@ -10,6 +10,8 @@ export function TurnControls({
   selectedPiece,
   onPiece,
   onPlayable,
+  onDestinations,
+  interaction,
   onExchange,
   onPlay,
   onDiscardHand,
@@ -19,6 +21,8 @@ export function TurnControls({
   selectedPiece?: string;
   onPiece: (id: string | undefined) => void;
   onPlayable: (ids: string[]) => void;
+  onDestinations: (moves: Move[]) => void;
+  interaction: RefObject<{ piece: (id: string) => void; move: (move: Move) => void }>;
   onExchange: (index: number) => void;
   onPlay: (action: Play) => void;
   onDiscardHand: () => void;
@@ -59,12 +63,49 @@ export function TurnControls({
     ).values(),
   ];
   const ids = [...new Set(next.map((m) => m.piece))];
-  const idsKey = ids.join(',');
+  const targets = next
+    .filter((m) => m.kind === 'swap' && m.piece === selectedPiece)
+    .map((m) => (m.kind === 'swap' ? m.target : ''));
+  const idsKey = [...ids, ...targets].join(',');
   useEffect(() => {
-    onPlayable(ids);
+    onPlayable([...ids, ...targets]);
   }, [idsKey, onPlayable]);
   const complete = draft.length > 0 && actions.some((p) => p.moves.length === draft.length),
     discard = isTurn && !view.options.length;
+  const shownMoves = complete
+    ? draft
+    : next.filter((m) => !selectedPiece || m.piece === selectedPiece);
+  const shownKey = JSON.stringify(shownMoves);
+  useEffect(() => {
+    onDestinations(shownMoves);
+  }, [shownKey, onDestinations]);
+  function addMove(move: Move) {
+    if (busy || !next.some((m) => same(m, move))) return;
+    setDraft([...draft, move]);
+    onPiece(undefined);
+  }
+  function selectPiece(id: string) {
+    if (busy) return;
+    const target = next.find(
+      (m) => m.kind === 'swap' && m.piece === selectedPiece && m.target === id,
+    );
+    if (target) {
+      addMove(target);
+      return;
+    }
+    const choices = next.filter((m) => m.piece === id);
+    if (
+      choices.length === 1 &&
+      choices[0].kind !== 'swap' &&
+      view.hand[card ?? -1] !== 7 &&
+      as !== 7
+    )
+      addMove(choices[0]);
+    else onPiece(id);
+  }
+  useEffect(() => {
+    interaction.current = { piece: selectPiece, move: addMove };
+  });
   function choose(index: number) {
     setCard(index);
     setDraft([]);
@@ -164,7 +205,7 @@ export function TurnControls({
                 key={id}
                 disabled={busy}
                 aria-pressed={selectedPiece === id}
-                onClick={() => onPiece(id)}
+                onClick={() => selectPiece(id)}
               >
                 <i style={{ background: PALETTE[Number(id[0])] }} />
                 {COLOR_NAMES[Number(id[0])]} {Number(id[2]) + 1}
@@ -181,8 +222,7 @@ export function TurnControls({
                   key={JSON.stringify(m)}
                   disabled={busy}
                   onClick={() => {
-                    setDraft([...draft, m]);
-                    onPiece(undefined);
+                    addMove(m);
                   }}
                 >
                   {moveLabel(m)}

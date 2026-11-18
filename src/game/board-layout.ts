@@ -87,7 +87,7 @@ export function boardLayout(game: Pick<Game, 'players'>): BoardLayout {
       sector === 0 ? [152, 240 - i * 40] : [start[0] + i * 40, 160],
     );
     const reserve = Array.from({ length: 4 }, (_, i): Point =>
-      sector === 0 ? [63, 210 + i * 20] : [start[0] - 30 + i * 20, 70],
+      sector === 0 ? [63, 210 + i * 20] : [start[0] - 30 + i * 20, 210],
     );
     homes[order[sector]] = home;
     reserves[order[sector]] = reserve;

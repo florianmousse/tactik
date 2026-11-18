@@ -19,7 +19,7 @@ const name = z
   .min(1)
   .max(24)
   .regex(/^[\p{L}\p{N} ._'-]+$/u, 'Pseudo : lettres, chiffres, espaces et . _ - uniquement.');
-const code = z.string().regex(/^[A-F0-9]{12}$/);
+const code = z.string().regex(/^(?:[A-Z2-9]{8}|[A-F0-9]{12})$/);
 const move = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('start'), piece: z.string().regex(/^[0-7]-[0-3]$/) }).strict(),
   z
@@ -40,12 +40,17 @@ const move = z.discriminatedUnion('kind', [
 ]);
 const version = z.number().int().nonnegative();
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('list') }).strict(),
+  z
+    .object({ type: z.literal('kick'), code, version, seat: z.number().int().min(1).max(7) })
+    .strict(),
   z
     .object({
       type: z.literal('create'),
       name,
       capacity: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(6), z.literal(8)]),
       jokers: z.boolean().optional(),
+      public: z.boolean().optional(),
     })
     .strict(),
   z.object({ type: z.literal('join'), code, name }).strict(),

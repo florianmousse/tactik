@@ -1,7 +1,9 @@
 'use client';
 import { colorOrder, trackLength } from '@/game/engine';
 import { boardLayout } from '@/game/board-layout';
-import type { View } from '@/game/types';
+import { moveDestination } from '@/game/move-preview';
+import { moveLabel } from '@/game/labels';
+import type { View, Move } from '@/game/types';
 import { cardSymbol, COLOR_NAMES } from '@/game/labels';
 export { COLOR_NAMES } from '@/game/labels';
 export const PALETTE = [
@@ -19,8 +21,12 @@ export function Board({
   selected,
   playable,
   onPiece,
+  destinations = [],
+  onMove,
 }: {
   game: View;
+  destinations?: Move[];
+  onMove?: (move: Move) => void;
   selected?: string;
   playable: string[];
   onPiece: (id: string) => void;
@@ -157,6 +163,38 @@ export function Board({
           {game.discard.length ? cardSymbol(game.discard.at(-1)!) : ''}
         </text>
       </g>
+      {destinations.map((move) => {
+        const { color, position } = moveDestination(game, move);
+        const [x, y] =
+          position >= length ? layout.homes[color][position - length] : layout.track[position];
+        return (
+          <g
+            key={JSON.stringify(move)}
+            role="button"
+            tabIndex={onMove ? 0 : -1}
+            aria-label={`Destination : ${moveLabel(move)}`}
+            className="destination"
+            onClick={() => onMove?.(move)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onMove?.(move);
+              }
+            }}
+          >
+            <circle
+              cx={x}
+              cy={y}
+              r="16"
+              fill="#ffffff99"
+              stroke="#155b86"
+              strokeWidth="3"
+              strokeDasharray="4 2"
+            />
+            <circle cx={x} cy={y} r="5" fill={PALETTE[color]} stroke="#243b32" />
+          </g>
+        );
+      })}
       {game.pieces.map((p) => {
         const n = Number(p.id.split('-')[1]);
         const [x, y] =
@@ -165,9 +203,19 @@ export function Board({
             : p.position >= length
               ? layout.homes[p.color][p.position - length]
               : layout.track[p.position];
-        const enabled = playable.includes(p.id),
-          horizontal =
-            p.position < 0 && layout.reserves[p.color][0][0] === layout.reserves[p.color][1][0];
+        const landing = destinations.find((move) => {
+          const target = moveDestination(game, move);
+          return (
+            p.position >= 0 &&
+            target.position === p.position &&
+            (p.position < length || target.color === p.color)
+          );
+        });
+        const enabled = playable.includes(p.id) || Boolean(landing && onMove);
+        const choose = () => {
+          if (playable.includes(p.id)) onPiece(p.id);
+          else if (landing) onMove?.(landing);
+        };
         return (
           <g
             key={p.id}
@@ -175,11 +223,11 @@ export function Board({
             tabIndex={enabled ? 0 : -1}
             aria-disabled={!enabled}
             aria-label={`${COLOR_NAMES[p.color]} ${n + 1}, ${p.position < 0 ? 'réserve' : p.position >= length ? 'maison' : p.stake ? 'pieu' : 'parcours'}`}
-            onClick={() => enabled && onPiece(p.id)}
+            onClick={() => enabled && choose()}
             onKeyDown={(e) => {
               if (enabled && (e.key === 'Enter' || e.key === ' ')) {
                 e.preventDefault();
-                onPiece(p.id);
+                choose();
               }
             }}
             className={enabled ? 'peg selectable' : 'peg'}
@@ -195,21 +243,10 @@ export function Board({
                 strokeDasharray={selected === p.id ? undefined : '3 3'}
               />
             )}
-            <g
-              transform={`translate(${x},${y}) rotate(${horizontal ? 90 : 0})`}
-              filter="url(#peg-shadow)"
-            >
-              <rect
-                x="-8"
-                y="-13"
-                width="16"
-                height="26"
-                rx="5"
-                fill={PALETTE[p.color]}
-                stroke="#2228"
-              />
-              <ellipse cy="-8" rx="7" ry="4" fill={PALETTE[p.color]} stroke="#fff5" />
-              {p.stake && <ellipse cy="-8" rx="3.5" ry="2.3" fill="#1e1b16" />}
+            <g transform={`translate(${x},${y})`} filter="url(#peg-shadow)">
+              <circle r="8.5" fill={PALETTE[p.color]} stroke="#26251e" strokeWidth="1.2" />
+              <circle cx="-2" cy="-2" r="4" fill="#fff" opacity=".23" />
+              {p.stake && <circle r="3" fill="#191919" stroke="#fff" strokeWidth="1" />}
             </g>
           </g>
         );

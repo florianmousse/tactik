@@ -1,6 +1,6 @@
 # TAC-TIK
 
-Jeu de plateau web pour 2, 3, 4, 6 ou 8 joueurs. Salons privés, chat, humains et bots, Joker et sauvegarde en ligne. Le plateau SVG reprend les chemins, maisons, réserves et panneaux rectangulaires de la photo fournie. Les cartes et la validation restent dans le même panneau.
+Jeu de plateau web pour 2, 3, 4, 6 ou 8 joueurs. Salons publics ou privés, chat, humains et bots, Joker et sauvegarde en ligne. Le plateau SVG reprend les chemins, maisons, réserves et panneaux rectangulaires de la photo fournie. Les cartes et la validation restent dans le même panneau.
 
 **Site déjà publié :** lire [UPGRADE.md](docs/UPGRADE.md) pour appliquer la deuxième migration et corriger la configuration Vercel/Supabase. Le mode solo est utilisable sans service externe. La nouvelle version du multijoueur exige encore la migration et une recette sur le service configuré.
 
@@ -69,7 +69,7 @@ Le navigateur envoie une intention. Le serveur vérifie identité, appartenance,
 
 ## Configuration
 
-Pour une première installation, suivre [DEPLOYMENT.md](docs/DEPLOYMENT.md). Pour le site existant, suivre [UPGRADE.md](docs/UPGRADE.md). Les deux migrations sont nécessaires, dans l'ordre ; ne pas réexécuter la première si elle est déjà appliquée.
+Pour une première installation, suivre [DEPLOYMENT.md](docs/DEPLOYMENT.md). Pour le site existant, suivre [UPGRADE.md](docs/UPGRADE.md). Les trois migrations sont nécessaires, dans l'ordre ; ne pas réexécuter la première si elle est déjà appliquée.
 
 Copier `.env.example` vers `.env.local` seulement si le fichier local n'existe pas. Ne jamais placer des secrets dans le fichier d'exemple, même temporairement.
 
@@ -98,7 +98,7 @@ Diagnostic de configuration en lecture seule : `node --env-file=.env.local scrip
 ## Limites
 
 - Pas de TOCK ni carte 13. Les 12 cartes ordinaires sont présentes en quatre exemplaires par paquet ; le Joker supplémentaire a été confirmé par le propriétaire.
-- Pas de matchmaking public, spectateurs, expulsion ou remplacement en cours de partie.
+- Liste des salons publics ouverts (30 maximum). Exclusion par le créateur avant le lancement. Pas de spectateurs ni de remplacement en cours de partie.
 - Les bots en ligne avancent tant qu'un membre est connecté. Ils reprennent au retour des joueurs, sans processus permanent Vercel.
 - La session anonyme appartient au navigateur. Effacer son stockage fait perdre sa place ; le pseudo ne sert jamais de preuve d'identité.
 - Les salons expirent sept jours après création ; planifier la purge décrite dans le guide. Les messages sont supprimés avec le salon.
@@ -106,3 +106,11 @@ Diagnostic de configuration en lecture seule : `node --env-file=.env.local scrip
 - La disposition à 8 prolonge le panneau central selon la logique du plateau. Aucune photo de l'extension à 8 n'a été fournie.
 
 Le code et les visuels sont une adaptation indépendante. Lire [SECURITY.md](docs/SECURITY.md) pour les protections et limites. Aucun résultat de test local ne remplace la vérification du CAPTCHA et des permissions du déploiement réel.
+
+## Salons publics et commandes directes
+
+Appliquer aussi `supabase/migrations/202611180003_public_rooms.sql` avant de mettre cette version en ligne. Les anciens salons restent prives. La case Salon public rend le salon visible dans la liste des parties ouvertes ; rejoindre utilise le pseudo sans saisie de code. Une session anonyme verifiee et les quotas restent obligatoires pour la liste.
+
+Les nouvelles invitations ont 8 caracteres sans I, O, 0 ou 1 ; les anciens codes a 12 caracteres restent valables. Le createur peut exclure un invite avant le lancement. Cette identite ne peut plus rejoindre ce salon, lire son chat ni recevoir ses signaux.
+
+Un coup simple demande carte, pion, puis une seule confirmation. Les destinations sont affichees sur le plateau ; les choix de maison et les segments du 7 restent explicites. Pour permuter, choisir son pion puis le pion cible directement sur le plateau, ou utiliser les boutons nommes. Le chat se replie avec son bouton et reste dans le panneau lateral sur mobile. Un bandeau rappelle vos couleurs, votre equipe et votre partenaire.

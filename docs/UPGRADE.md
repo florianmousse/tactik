@@ -12,7 +12,7 @@
 
 ## Supabase déjà installé
 
-Exécuter **uniquement** `supabase/migrations/202611180002_chat_bots.sql` dans le SQL Editor du projet existant. Ne pas réexécuter la première migration.
+Appliquer les migrations manquantes dans cet ordre : `202611180002_chat_bots.sql`, puis `202611180003_public_rooms.sql`. Ne pas reexecuter une migration deja appliquee. La migration 003 est indispensable aux codes courts, aux salons publics et au retrait atomique des droits apres exclusion.
 
 Cette migration ajoute `room_messages`, le compteur de notification du chat et adapte le commit aux bots. Elle ne supprime pas les parties ni les utilisateurs. Les anciens salons et jeux restent sans Joker, sauf ceux créés avec cette nouvelle option. La capacité et les cartes des parties commencées ne changent pas.
 

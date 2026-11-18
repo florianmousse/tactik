@@ -4,8 +4,8 @@ import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import type { Session } from '@supabase/supabase-js';
 import { createGame, discardHand, exchange, play, viewFor } from '@/game/engine';
 import { pendingBot, stepBot } from '@/game/bots';
-import type { Capacity, Game, Play } from '@/game/types';
-import type { RoomView } from '@/game/room';
+import type { Capacity, Game, Play, Move } from '@/game/types';
+import type { RoomView, PublicRoom } from '@/game/room';
 import type { Command } from '@/server/schema';
 import { configurationIssue, onlineConfigured, supabase } from '@/lib/supabase';
 import { authErrorMessage, captchaErrorMessage } from '@/lib/auth-errors';
@@ -22,8 +22,15 @@ export function GameApp() {
     [capacity, setCapacity] = useState<Capacity>(6),
     [jokers, setJokers] = useState(true),
     [code, setCode] = useState('');
+  const [publicRoom, setPublicRoom] = useState(false),
+    [publicRooms, setPublicRooms] = useState<PublicRoom[] | null>(null),
+    [destinations, setDestinations] = useState<Move[]>([]);
+  const interaction = useRef<{ piece: (id: string) => void; move: (move: Move) => void }>({
+    piece: () => {},
+    move: () => {},
+  });
   const [tab, setTab] = useState<'create' | 'join'>('create'),
-    [panel, setPanel] = useState<'log' | 'chat'>('log');
+    [panel, setPanel] = useState<'log' | 'chat' | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
@@ -57,7 +64,7 @@ export function GameApp() {
       }),
     [],
   );
-  const api = useCallback(async (command: Command, authenticate = false) => {
+  const api = useCallback(async <T extends Command>(command: T, authenticate = false) => {
     const client = supabase();
     let {
       data: { session },
@@ -84,7 +91,13 @@ export function GameApp() {
         const next = await api({ type: 'sync', code: roomCode });
         if (alive.current) receive(next);
       } catch (e) {
-        if (alive.current) setError((e as Error).message);
+        if (alive.current) {
+          setError((e as Error).message);
+          if (e instanceof ApiError && (e.status === 403 || e.status === 404)) {
+            setRoom(null);
+            history.replaceState(null, '', location.pathname);
+          }
+        }
       }
     },
     [api, receive],
@@ -92,7 +105,7 @@ export function GameApp() {
   useEffect(() => {
     alive.current = true;
     const invitation = new URLSearchParams(location.search).get('salon');
-    if (invitation && /^[A-F0-9]{12}$/i.test(invitation)) {
+    if (invitation && /^(?:[A-Z2-9]{8}|[A-F0-9]{12})$/i.test(invitation)) {
       setCode(invitation.toUpperCase());
       setTab('join');
     }
@@ -108,7 +121,7 @@ export function GameApp() {
         setSignedIn(Boolean(session));
         setAuthReady(true);
         if (error) setError(authErrorMessage(error.code));
-        if (session && invitation && /^[A-F0-9]{12}$/i.test(invitation)) {
+        if (session && invitation && /^(?:[A-Z2-9]{8}|[A-F0-9]{12})$/i.test(invitation)) {
           try {
             const next = await requestGame(
               { type: 'sync', code: invitation.toUpperCase() },
@@ -190,7 +203,7 @@ export function GameApp() {
       clearTimeout(timer);
     };
   }, [room?.version, room?.code, Boolean(local), api, receive, synchronize]);
-  async function run(command: Command): Promise<boolean> {
+  async function run(command: Exclude<Command, { type: 'list' }>): Promise<boolean> {
     setBusy(true);
     setError('');
     try {
@@ -200,7 +213,7 @@ export function GameApp() {
         const address = new URL(location.href);
         address.searchParams.set('salon', next.code);
         history.replaceState(null, '', address);
-        setPanel('chat');
+        setPanel(null);
       }
       return true;
     } catch (e) {
@@ -368,7 +381,7 @@ export function GameApp() {
                 e.preventDefault();
                 void run(
                   tab === 'create'
-                    ? { type: 'create', name, capacity, jokers }
+                    ? { type: 'create', name, capacity, jokers, public: publicRoom }
                     : { type: 'join', name, code },
                 );
               }}
@@ -386,6 +399,14 @@ export function GameApp() {
               </label>
               {tab === 'create' ? (
                 <>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={publicRoom}
+                      onChange={(e) => setPublicRoom(e.target.checked)}
+                    />
+                    Salon public - visible dans la liste
+                  </label>
                   <fieldset>
                     <legend>Joueurs</legend>
                     <div className="capacity">
@@ -426,14 +447,14 @@ export function GameApp() {
                       setCode(
                         e.target.value
                           .toUpperCase()
-                          .replace(/[^A-F0-9]/g, '')
+                          .replace(/[^A-Z0-9]/g, '')
                           .slice(0, 12),
                       )
                     }
-                    minLength={12}
+                    minLength={8}
                     maxLength={12}
                     required
-                    placeholder="12 caractères"
+                    placeholder="8 caractères"
                   />
                 </label>
               )}
@@ -490,6 +511,44 @@ export function GameApp() {
               </button>
               {!onlineConfigured && <p className="error-text">{configurationIssue}</p>}
             </form>
+            <section className="public-rooms" aria-label="Salons publics">
+              <h2>Salons publics</h2>
+              <button
+                disabled={connectionDisabled}
+                onClick={async () => {
+                  setBusy(true);
+                  setError('');
+                  try {
+                    setPublicRooms((await api({ type: 'list' }, true)).rooms);
+                  } catch (e) {
+                    setError((e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {publicRooms ? 'Actualiser la liste' : 'Voir les parties ouvertes'}
+              </button>
+              {publicRooms?.length === 0 && <p>Aucun salon disponible pour le moment.</p>}
+              {publicRooms?.map((item) => (
+                <div className="public-room" key={item.code}>
+                  <span>
+                    <b>{item.name}</b> - {item.players}/{item.capacity} joueurs
+                    <br />
+                    {item.jokers ? 'Avec Joker' : 'Sans Joker'}
+                  </span>
+                  <button
+                    disabled={connectionDisabled || !name.trim()}
+                    onClick={() => run({ type: 'join', code: item.code, name })}
+                  >
+                    Rejoindre
+                  </button>
+                </div>
+              ))}
+              {publicRooms && !name.trim() && (
+                <p className="muted">Renseignez votre pseudo pour rejoindre.</p>
+              )}
+            </section>
             <div className="solo-entry">
               <button className="secondary wide" onClick={solo}>
                 Jouer contre {capacity - 1} bots
@@ -538,11 +597,16 @@ export function GameApp() {
                   <span>{i + 1}</span>
                   <b>{room.people[i]?.name ?? 'Place libre'}</b>
                   <small>{room.people[i]?.bot ? 'Bot' : room.people[i]?.me ? 'Vous' : ''}</small>
-                  {room.host && room.people[i]?.bot && (
+                  {room.host && i > 0 && room.people[i] && (
                     <button
                       disabled={busy}
                       onClick={() =>
-                        run({ type: 'bot-remove', code: room.code, version: room.version, seat: i })
+                        run({
+                          type: room.people[i].bot ? 'bot-remove' : 'kick',
+                          code: room.code,
+                          version: room.version,
+                          seat: i,
+                        })
                       }
                       aria-label={`Retirer ${room.people[i].name}`}
                     >
@@ -587,6 +651,17 @@ export function GameApp() {
       {view && (
         <div className="game-layout">
           <section className="table-area">
+            <div className="team-identity">
+              <b>Vous : {view.players[view.me].colors.map((c) => COLOR_NAMES[c]).join(' + ')}</b>
+              <span>
+                {view.players.length >= 4
+                  ? `Equipe ${view.players[view.me].team + 1} avec ${view.players
+                      .filter((p, i) => i !== view.me && p.team === view.players[view.me].team)
+                      .map((p) => `${p.name} (${p.colors.map((c) => COLOR_NAMES[c]).join(', ')})`)
+                      .join(', ')}`
+                  : 'Vous contrôlez ces deux couleurs'}
+              </span>
+            </div>
             <div className="players">
               {view.players.map((p, i) => (
                 <div
@@ -615,8 +690,10 @@ export function GameApp() {
               <Board
                 game={view}
                 selected={selectedPiece}
-                playable={playable}
-                onPiece={setSelectedPiece}
+                playable={busy ? [] : playable}
+                destinations={destinations}
+                onMove={(move) => !busy && interaction.current.move(move)}
+                onPiece={(id) => !busy && interaction.current.piece(id)}
               />
             </div>
             <div className="board-tools">
@@ -633,6 +710,8 @@ export function GameApp() {
               selectedPiece={selectedPiece}
               onPiece={setSelectedPiece}
               onPlayable={setPlayable}
+              onDestinations={setDestinations}
+              interaction={interaction}
               onExchange={submitExchange}
               onPlay={submitPlay}
               onDiscardHand={submitDiscard}
@@ -642,7 +721,8 @@ export function GameApp() {
                 <button
                   className={panel === 'log' ? 'selected' : ''}
                   aria-pressed={panel === 'log'}
-                  onClick={() => setPanel('log')}
+                  onClick={() => setPanel(panel === 'log' ? null : 'log')}
+                  aria-expanded={panel === 'log'}
                 >
                   Historique
                 </button>
@@ -650,9 +730,10 @@ export function GameApp() {
                   <button
                     className={panel === 'chat' ? 'selected' : ''}
                     aria-pressed={panel === 'chat'}
-                    onClick={() => setPanel('chat')}
+                    onClick={() => setPanel(panel === 'chat' ? null : 'chat')}
+                    aria-expanded={panel === 'chat'}
                   >
-                    Chat ({room.messages.length})
+                    {panel === 'chat' ? 'Fermer le chat' : `Chat (${room.messages.length})`}
                   </button>
                 )}
               </div>
@@ -661,13 +742,13 @@ export function GameApp() {
                   messages={room.messages}
                   onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
                 />
-              ) : (
+              ) : panel === 'log' ? (
                 <div className="journal">
                   {view.log.slice(0, 8).map((line, i) => (
                     <p key={`${i}-${line}`}>{line}</p>
                   ))}
                 </div>
-              )}
+              ) : null}
             </section>
           </aside>
         </div>

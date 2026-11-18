@@ -14,7 +14,7 @@ La suite couvre : configurations 2/3/4/6/8, distribution, échange simultané, p
 
 ## Intégration Supabase
 
-Exclusivement sur un projet de test où les deux migrations ont été appliquées. Ajouter `RUN_SUPABASE_INTEGRATION=1` au fichier `.env.local` puis :
+Exclusivement sur un projet de test où les trois migrations ont été appliquées. Ajouter `RUN_SUPABASE_INTEGRATION=1` au fichier `.env.local` puis :
 
 ```sh
 node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts
@@ -57,3 +57,17 @@ Contrôle navigateur local de la refonte : partie à huit avec sept bots, échan
 Les nouveaux tests couvrent Joker (y compris démarrage et 7), deux paquets à huit, défausse complète autorisée en réserve et refusée derrière un pieu, bots et géométrie du plateau. La suite d'intégration inclut désormais le refus de lecture et de RPC du chat pour membre/tiers/anonyme, le refus d'un auteur tiers, l'idempotence du message, la séparation version/chat_revision et l'exclusion des bots des membres Auth. Ces scénarios SQL restent à exécuter sur un projet de test.
 
 Le diagnostic en lecture a identifié une origine refusée sur l'API publiée, les nouvelles inscriptions Auth désactivées et la migration chat absente. Voir `UPGRADE.md`. Il ne prouve pas la validité des clés Turnstile sur le déploiement.
+
+## Salons publics et ergonomie - nouvelle verification
+
+Tests ajoutes : panneaux de reserve sans recouvrement du parcours, destinations comparees au moteur (sortie, recul, maison, permutation, 7), nouveaux codes et anciens codes, commandes strictes, exclusion reservee a l'hote avant lancement. La suite SQL couvre aussi liste minimale publique, absence des salons prives, RPC refusee aux clients, retrait du membre et de ses signaux, chat interdit apres exclusion et refus du CAS obsolete.
+
+Recette restant a effectuer : salon public visible et joignable avec deux identites, exclusion et tentative de reentree, fermeture de liste apres lancement ou remplissage, anciens liens, mobile 390 px et bureau, capture par clic sur destination occupee, permutation directe, 7 fractionne et annulation, reconnexion et concurrence. L'exclusion pendant une partie commencee est volontairement refusee pour conserver les equipes et les mains.
+
+Resultats de cette livraison :
+
+- `npm run check` : reussi, 32 tests et TypeScript strict.
+- `npm run build` : reussi, compilation Next.js de production.
+- `node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` : un test ignore, car RUN_SUPABASE_INTEGRATION n'est pas active. Aucun acces multijoueur reel valide.
+- Recette navigateur non executee : acces localhost du navigateur integre en timeout, puis connexion au navigateur Windows expiree. Aucun resultat visuel bureau/mobile revendique pour ces changements.
+- Migration 003 non appliquee et version non deployee. Appliquer les migrations manquantes sur un projet de test, executer l'integration et la recette ci-dessus avant publication.

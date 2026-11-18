@@ -2,6 +2,8 @@ import type { Capacity, Game, Person, View } from './types';
 export type ChatMessage = { id: string; name: string; text: string; at: string; me: boolean };
 export type Room = {
   host: string;
+  public?: boolean;
+  banned?: string[];
   capacity: Capacity;
   people: Person[];
   jokers?: boolean;
@@ -17,3 +19,12 @@ export type RoomView = {
   jokers: boolean;
   messages: ChatMessage[];
 };
+
+export type PublicRoom = {
+  code: string;
+  name: string;
+  capacity: number;
+  players: number;
+  jokers: boolean;
+};
+export type RoomList = { rooms: PublicRoom[] };

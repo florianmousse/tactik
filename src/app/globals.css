@@ -825,14 +825,9 @@ legend {
     flex: 0 0 auto;
   }
   .session-panel:has(.chat-panel) {
-    position: fixed;
-    right: 10px;
-    left: 10px;
-    top: 58px;
-    bottom: 50dvh;
-    max-height: none;
-    z-index: 15;
-    box-shadow: 0 8px 25px #0003;
+    max-height: 27dvh;
+    min-height: 160px;
+    flex: 1 1 auto;
   }
   .session-panel .tabs {
     margin: 0;
@@ -881,5 +876,47 @@ legend {
   * {
     scroll-behavior: auto !important;
     transition: none !important;
+  }
+}
+
+.public-rooms {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.public-room {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.team-identity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: #e1ebd5;
+  border: 1px solid #9caf91;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.destination {
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .team-identity {
+    font-size: 10px;
+    padding: 6px;
+    margin-bottom: 4px;
+  }
+  .game-sidebar:has(.chat-panel) .turn-controls {
+    max-height: 25dvh;
+  }
+  .game-sidebar {
+    overflow: auto;
+    flex-shrink: 1;
   }
 }

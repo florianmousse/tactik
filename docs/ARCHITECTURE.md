@@ -68,7 +68,7 @@ La requête `join` est idempotente pour un membre existant. L'identité ne dépe
 
 Les états sont petits (jusqu'à 32 pions et 98 cartes). Les coups fractionnés sont calculés par exploration exhaustive bornée à quatre pions et sept pas. Les lectures sont limitées à 90/minute/utilisateur et 240/minute/IP. Le signal Realtime est complété par une lecture toutes les 15 secondes sur un onglet visible.
 
-Les invitations ne sont pas listables publiquement. À grande échelle, mesurer le coût des quotas SQL, limiter en amont dans Vercel, mettre les lectures de commandes sous observabilité sans données privées et optimiser les partitions équivalentes du 7 si nécessaire. Toute évolution de protocole devrait introduire une version de schéma avant de faire cohabiter d'anciennes parties avec de nouvelles règles.
+Seuls les salons explicitement publics sont listables, avec une projection limitee aux informations d'accueil. À grande échelle, mesurer le coût des quotas SQL, limiter en amont dans Vercel, mettre les lectures de commandes sous observabilité sans données privées et optimiser les partitions équivalentes du 7 si nécessaire. Toute évolution de protocole devrait introduire une version de schéma avant de faire cohabiter d'anciennes parties avec de nouvelles règles.
 
 ## Chat et bots
 
@@ -77,3 +77,11 @@ Le chat utilise `append_room_message`, réservé au serveur après vérification
 Les bots sont des sièges du salon, jamais des identités Auth. Seul l'hôte les ajoute ou les retire avant le lancement. Un navigateur présent demande `bot-tick` ; le serveur vérifie le tour, calcule un seul coup et le sauvegarde par CAS. La stratégie reçoit une projection privée normale. Sans navigateur actif, les bots attendent. Le mode local utilise le même moteur.
 
 `board-layout.ts` décrit les panneaux rectangulaires et leurs coordonnées. `turn-controls.tsx` regroupe main, sélection des pions, composition du 7 et validation. Les mises à jour du chat ne réinitialisent pas une sélection en cours.
+
+## Liste publique et exclusion
+
+`list_public_rooms` est une RPC serveur exclusive. Elle retourne au plus 30 salons publics non expires, non commences et non complets : code, pseudo du createur, capacite, occupation et option Joker. Aucun etat de jeu, UUID, message ou choix prive ne traverse ce contrat. La commande HTTP `list` exige une identite verifiee et les quotas habituels.
+
+`kick` exige hote, salon non commence, siege invite humain et version attendue. Le commit CAS retire aussi les anciens `room_members` dans la meme transaction. `banned` reste serveur uniquement et bloque une nouvelle jonction par cette identite. Le chat verrouille la ligne salon avant de verifier l'appartenance pour serialiser ses envois avec une exclusion. Les salons historiques sans `public` restent prives.
+
+`move-preview.ts` calcule uniquement des reperes graphiques a partir des mouvements deja autorises dans la projection. Cette aide ne remplace jamais la validation serveur.

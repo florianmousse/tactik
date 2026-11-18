@@ -1,10 +1,11 @@
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
-import { createHmac, randomBytes, randomInt, randomUUID } from 'node:crypto';
-import type { Room, RoomView } from '@/game/room';
+import { createHmac, randomInt, randomUUID } from 'node:crypto';
+import type { Room, RoomView, RoomList } from '@/game/room';
 import { createGame, discardHand, exchange, play, RuleError, viewFor } from '@/game/engine';
 import { pendingBot, stepBot } from '@/game/bots';
 import type { Command } from './schema';
+import { excludeGuest } from './room-access';
 
 export class HttpError extends Error {
   constructor(
@@ -84,13 +85,21 @@ async function projection(
     })),
   };
 }
-export async function dispatch(command: Command, user: string): Promise<RoomView> {
+export async function dispatch(command: Command, user: string): Promise<RoomView | RoomList> {
   const db = admin();
+  if (command.type === 'list') {
+    const { data, error } = await db.rpc('list_public_rooms');
+    if (error)
+      throw new HttpError(503, 'Liste indisponible. Vérifier la migration des salons publics.');
+    return { rooms: data ?? [] };
+  }
   if (command.type === 'create') {
     await limit(`create:${user}`, 5, 3600);
-    const code = randomBytes(6).toString('hex').toUpperCase();
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const code = Array.from({ length: 8 }, () => alphabet[randomInt(alphabet.length)]).join('');
     const room: Room = {
       host: user,
+      public: command.public ?? false,
       capacity: command.capacity,
       people: [{ id: user, name: command.name }],
       game: null,
@@ -116,6 +125,7 @@ export async function dispatch(command: Command, user: string): Promise<RoomView
   const room = data.state as Room,
     member = room.people.findIndex((p) => p.id === user);
   if (command.type === 'join') {
+    if (room.banned?.includes(user)) throw new HttpError(403, 'Vous avez été exclu de ce salon.');
     if (member >= 0) return projection(command.code, data.version, room, user);
     if (room.game || room.people.length >= room.capacity)
       throw new HttpError(409, 'Ce salon est complet ou la partie a commencé.');
@@ -137,7 +147,13 @@ export async function dispatch(command: Command, user: string): Promise<RoomView
     }
     if (command.version !== data.version)
       throw new HttpError(409, 'La partie a changé. Actualisez avant de jouer.');
-    if (command.type === 'bot-add' || command.type === 'bot-remove') {
+    if (command.type === 'kick') {
+      try {
+        Object.assign(room, excludeGuest(room, user, command.seat));
+      } catch (e) {
+        throw new HttpError(403, (e as Error).message);
+      }
+    } else if (command.type === 'bot-add' || command.type === 'bot-remove') {
       if (room.host !== user || room.game)
         throw new HttpError(403, 'Seul le créateur peut modifier les bots avant le début.');
       if (command.type === 'bot-add') {

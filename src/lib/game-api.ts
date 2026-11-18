@@ -1,7 +1,7 @@
 'use client';
 import type { Session } from '@supabase/supabase-js';
 import type { Command } from '@/server/schema';
-import type { RoomView } from '@/game/room';
+import type { RoomView, RoomList } from '@/game/room';
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -10,7 +10,11 @@ export class ApiError extends Error {
     super(message);
   }
 }
-export async function requestGame(command: Command, session: Session): Promise<RoomView> {
+export type CommandResult<T extends Command> = T extends { type: 'list' } ? RoomList : RoomView;
+export async function requestGame<T extends Command>(
+  command: T,
+  session: Session,
+): Promise<CommandResult<T>> {
   let response: Response;
   try {
     response = await fetch('/api/game', {
@@ -33,5 +37,5 @@ export async function requestGame(command: Command, session: Session): Promise<R
     throw new ApiError(response.status, 'Réponse du serveur illisible. Réessayer.');
   }
   if (!response.ok) throw new ApiError(response.status, data.error || 'Requête refusée.');
-  return data as RoomView;
+  return data as CommandResult<T>;
 }

@@ -140,6 +140,63 @@ test(
       const members = await admin.from('room_members').select('user_id').eq('room_code', code);
       assert.equal(members.error, null);
       assert.deepEqual(members.data, [{ user_id: ids[0] }]);
+      const joined = {
+        ...state,
+        public: true,
+        capacity: 4,
+        people: [...state.people, { id: ids[1], name: 'Invite' }],
+      };
+      assert.equal(
+        (await admin.rpc('commit_game_room', { p_code: code, p_version: 2, p_state: joined })).data,
+        true,
+      );
+      assert.equal(
+        (await users[1].from('room_events').select('*').eq('room_code', code)).data?.length,
+        1,
+      );
+      for (const client of [anon, ...users])
+        assert.ok((await client.rpc('list_public_rooms')).error);
+      const listed = await admin.rpc('list_public_rooms');
+      assert.equal(listed.error, null);
+      assert.deepEqual(
+        listed.data.find((r: { code: string }) => r.code === code),
+        { code, name: 'Test', capacity: 4, players: 2, jokers: false },
+      );
+      const kicked = { ...joined, people: state.people, banned: [ids[1]] };
+      assert.equal(
+        (await admin.rpc('commit_game_room', { p_code: code, p_version: 3, p_state: kicked })).data,
+        true,
+      );
+      assert.deepEqual(
+        (await users[1].from('room_events').select('*').eq('room_code', code)).data,
+        [],
+      );
+      assert.deepEqual(
+        (await users[1].from('room_members').select('*').eq('room_code', code)).data,
+        [],
+      );
+      assert.ok(
+        (await admin.rpc('append_room_message', { ...message, p_id: randomUUID(), p_user: ids[1] }))
+          .error,
+      );
+      assert.equal(
+        (await admin.rpc('commit_game_room', { p_code: code, p_version: 3, p_state: joined })).data,
+        false,
+      );
+      assert.equal(
+        (
+          await admin.rpc('commit_game_room', {
+            p_code: code,
+            p_version: 4,
+            p_state: { ...kicked, public: false },
+          })
+        ).data,
+        true,
+      );
+      assert.equal(
+        (await admin.rpc('list_public_rooms')).data.some((r: { code: string }) => r.code === code),
+        false,
+      );
       const limits = await Promise.all(
         Array.from({ length: 5 }, () =>
           admin.rpc('consume_rate_limit', { p_key: rateKey, p_max: 2, p_seconds: 60 }),
