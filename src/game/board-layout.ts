@@ -90,7 +90,11 @@ export function boardLayout(game: Pick<Game, 'players'>): BoardLayout {
       sector === 0
         ? [63, 210 + i * 20]
         : sector === count / 2 - 1
-          ? [width - 192, 210 + i * 20]
+          ? // Keep the reserve inside the outer track pocket, not beside the center.
+            // Extensions use the side pocket to clear the preceding sector's holes.
+            count === 4
+            ? [start[0] - 30 + i * 20, 70]
+            : [width - 70, 180 + i * 20]
           : [start[0] - 30 + i * 20, 210],
     );
     homes[order[sector]] = home;

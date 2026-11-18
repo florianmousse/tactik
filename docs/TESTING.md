@@ -91,3 +91,9 @@ Nouveaux scenarios : bot evitant captures propres/alliees, capture forcee avec d
 Recette restante : survol et clavier de l'historique, dialogue mobile et Echap, fleches apres permutation et 7, lisibilite a 390 px, compteur chat sur deux clients, reception en arriere-plan, observation des bots locaux et rechargement apres erreur. Le controle navigateur etait bloque dans cette session (timeout du navigateur integre et continuation Firefox expiree) ; aucun nouveau controle visuel n'est revendique. Pas de changement de frontiere SQL dans cette livraison ; les integrations Supabase des migrations precedentes restent a executer sur le projet de test.
 
 Resultats de cette iteration : `npm run check` reussi (48 tests, TypeScript strict), `npm run build` reussi et `npm run format:check` reussi. Le test de plantage a ete observe en echec avant correction puis en succes. Pas de deploiement effectue. Cette iteration n'ajoute pas de migration ; la migration 004 des changements precedents reste necessaire a la version complete.
+
+## Placement des reserves - 18 novembre 2026
+
+Les reserves bleue et verte sont replacees dans les espaces libres exterieurs selon Screenshot_8 pour quatre couleurs. Les extensions a six et huit couleurs utilisent la poche laterale du panneau pour eviter les cases du secteur adjacent. Le test de non-recouvrement des panneaux et du parcours passe pour les trois configurations, ainsi que les tests d'orientation.
+
+Validation : `npm run check` reussi (48 tests et TypeScript), puis `npm run build` reussi. Rendus SVG du composant Board inspectes en images pour 4, 6 et 8 joueurs. Ce controle statique ne remplace pas une recette interactive mobile/bureau ; les limites navigateur precedentes restent applicables. Aucun deploiement effectue.

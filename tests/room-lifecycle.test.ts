@@ -107,8 +107,12 @@ test('orientation : départ en bas pour chaque joueur, cibles et plateau restent
         assert.ok(x > 0 && x < oriented.width && y > 0 && y < oriented.height);
       }
     }
-    for (const color of [0, 1, 2, 3])
+    for (const color of [0, 1])
       assert.equal(new Set(layout.reserves[color].map(([x]) => x)).size, 1);
+    for (const color of [2, 3]) {
+      const axis = layout.width === 584 ? 1 : 0;
+      assert.equal(new Set(layout.reserves[color].map((p) => p[axis])).size, 1);
+    }
     assert.deepEqual(game, before);
   }
 });

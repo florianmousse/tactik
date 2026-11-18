@@ -123,7 +123,7 @@ La reprise utilise la session Supabase existante, jamais le pseudo comme preuve 
 
 La migration `202611180004_presence_leave.sql` ajoute la presence privee : Present, En arriere-plan, Absent et Bot. Un signal est envoye toutes les 15 secondes tant que la table est visible, et lors des changements de visibilite. Sans signal pendant 45 secondes, le joueur est considere absent lors de la prochaine lecture (jusqu'a 15 secondes de delai supplementaire). Ce statut ne mesure pas les clics ni l'attention du joueur. Plusieurs onglets sont pris en compte.
 
-Votre fiche apparait en premier, avec votre coequipier sous votre pseudo. Le plateau tourne pour placer votre zone de depart dans sa moitie basse ; les coordonnees logiques et l'ordre des tours ne changent pas. Les reserves bleue et verte sont verticales comme les rouge et jaune.
+Votre fiche apparait en premier, avec votre coequipier sous votre pseudo. Le plateau tourne pour placer votre zone de depart dans sa moitie basse ; les coordonnees logiques et l'ordre des tours ne changent pas. Les reserves bleue et verte occupent les espaces libres au bord du parcours, entre les cases, sur les plateaux a 4, 6 et 8 couleurs.
 
 ## Observation, bots et historique
 
