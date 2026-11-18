@@ -1,16 +1,17 @@
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
-import type { Room, RoomView, RoomList } from '@/game/room';
+import type { Room, RoomView, RoomList, LeaveResult } from '@/game/room';
 import { createGame, discardHand, exchange, play, RuleError, viewFor } from '@/game/engine';
 import { pendingBot, stepBot } from '@/game/bots';
 import type { Command } from './schema';
-import { excludeGuest } from './room-access';
+import { excludeGuest, leaveTable } from './room-access';
 
 export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
   }
@@ -68,12 +69,30 @@ async function projection(
       503,
       'Chat indisponible. Vérifier la migration 202611180002 dans Supabase.',
     );
+  const presence = await admin()
+    .from('room_presence')
+    .select('user_id,active,seen_at')
+    .eq('room_code', code)
+    .gt('seen_at', new Date(Date.now() - 45000).toISOString());
+  if (presence.error)
+    throw new HttpError(503, 'Présence indisponible. Vérifier la migration 202611180004.');
   return {
     code,
     version,
     host: room.host === user,
     capacity: room.capacity,
-    people: room.people.map((p) => ({ name: p.name, me: p.id === user, bot: Boolean(p.bot) })),
+    people: room.people.map((p) => ({
+      name: p.name,
+      me: p.id === user,
+      bot: Boolean(p.bot),
+      presence: p.bot
+        ? 'bot'
+        : presence.data.some((r) => r.user_id === p.id && r.active)
+          ? 'online'
+          : presence.data.some((r) => r.user_id === p.id)
+            ? 'away'
+            : 'offline',
+    })),
     game: room.game ? viewFor(room.game, user) : null,
     jokers: room.jokers ?? false,
     messages: (data ?? []).reverse().map((m) => ({
@@ -85,7 +104,10 @@ async function projection(
     })),
   };
 }
-export async function dispatch(command: Command, user: string): Promise<RoomView | RoomList> {
+export async function dispatch(
+  command: Command,
+  user: string,
+): Promise<RoomView | RoomList | LeaveResult> {
   const db = admin();
   if (command.type === 'list') {
     const { data, error } = await db.rpc('list_public_rooms');
@@ -121,17 +143,54 @@ export async function dispatch(command: Command, user: string): Promise<RoomView
     .gt('expires_at', new Date().toISOString())
     .maybeSingle();
   if (error) throw new HttpError(503, 'Service temporairement indisponible.');
-  if (!data) throw new HttpError(404, 'Salon introuvable ou expiré.');
+  if (!data) throw new HttpError(404, 'Salon introuvable ou expiré.', 'ROOM_GONE');
   const room = data.state as Room,
     member = room.people.findIndex((p) => p.id === user);
   if (command.type === 'join') {
+    if (room.closed) throw new HttpError(410, 'Ce salon a été fermé.', 'ROOM_GONE');
     if (room.banned?.includes(user)) throw new HttpError(403, 'Vous avez été exclu de ce salon.');
     if (member >= 0) return projection(command.code, data.version, room, user);
-    if (room.game || room.people.length >= room.capacity)
+    if (room.game)
+      throw new HttpError(
+        409,
+        'Cette partie a commencé. Pour retrouver votre place, utilisez le même navigateur et le même profil que lors de votre arrivée. Le pseudo ne suffit pas.',
+        'IDENTITY_REQUIRED',
+      );
+    if (room.people.length >= room.capacity)
       throw new HttpError(409, 'Ce salon est complet ou la partie a commencé.');
     room.people.push({ id: user, name: command.name });
   } else {
-    if (member < 0) throw new HttpError(403, 'Vous ne faites pas partie de ce salon.');
+    if (member < 0)
+      throw new HttpError(403, 'Vous ne faites plus partie de ce salon.', 'NOT_MEMBER');
+    if (command.type === 'leave' || command.type === 'presence') {
+      if (command.version !== data.version)
+        throw new HttpError(409, 'La partie a changé. Synchronisez puis réessayez.');
+      const result =
+        command.type === 'leave'
+          ? await db.rpc('leave_game_room', {
+              p_code: command.code,
+              p_user: user,
+              p_connection: command.connection,
+              p_version: command.version,
+              p_state: leaveTable(room, user),
+            })
+          : await db.rpc('touch_room_presence', {
+              p_code: command.code,
+              p_user: user,
+              p_connection: command.connection,
+              p_version: command.version,
+              p_active: command.active,
+            });
+      if (result.error)
+        throw new HttpError(
+          503,
+          'Connexion au salon indisponible. Vérifier la migration 202611180004.',
+        );
+      if (!result.data)
+        throw new HttpError(409, 'La partie a changé. Synchronisez puis réessayez.');
+      if (command.type === 'leave') return { left: true, resumable: Boolean(room.game) };
+      return projection(command.code, data.version, room, user);
+    }
     if (command.type === 'sync') return projection(command.code, data.version, room, user);
     if (command.type === 'chat') {
       await limit(`chat:${user}`, 12);

@@ -4,6 +4,7 @@ export type Room = {
   host: string;
   public?: boolean;
   banned?: string[];
+  closed?: boolean;
   capacity: Capacity;
   people: Person[];
   jokers?: boolean;
@@ -14,7 +15,7 @@ export type RoomView = {
   version: number;
   host: boolean;
   capacity: number;
-  people: { name: string; me: boolean; bot: boolean }[];
+  people: { name: string; me: boolean; bot: boolean; presence: Presence }[];
   game: View | null;
   jokers: boolean;
   messages: ChatMessage[];
@@ -28,3 +29,5 @@ export type PublicRoom = {
   jokers: boolean;
 };
 export type RoomList = { rooms: PublicRoom[] };
+export type Presence = 'online' | 'away' | 'offline' | 'bot';
+export type LeaveResult = { left: true; resumable: boolean };

@@ -1,16 +1,21 @@
 'use client';
 import type { Session } from '@supabase/supabase-js';
 import type { Command } from '@/server/schema';
-import type { RoomView, RoomList } from '@/game/room';
+import type { RoomView, RoomList, LeaveResult } from '@/game/room';
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
   }
 }
-export type CommandResult<T extends Command> = T extends { type: 'list' } ? RoomList : RoomView;
+export type CommandResult<T extends Command> = T extends { type: 'list' }
+  ? RoomList
+  : T extends { type: 'leave' }
+    ? LeaveResult
+    : RoomView;
 export async function requestGame<T extends Command>(
   command: T,
   session: Session,
@@ -36,6 +41,7 @@ export async function requestGame<T extends Command>(
   } catch {
     throw new ApiError(response.status, 'Réponse du serveur illisible. Réessayer.');
   }
-  if (!response.ok) throw new ApiError(response.status, data.error || 'Requête refusée.');
+  if (!response.ok)
+    throw new ApiError(response.status, data.error || 'Requête refusée.', data.code);
   return data as CommandResult<T>;
 }

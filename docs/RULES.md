@@ -58,3 +58,9 @@ Après avoir rentré ses quatre pions, un joueur contrôle ceux du partenaire au
 Les bots ont les mêmes règles et ne reçoivent que leur projection privée. Ils privilégient les maisons et les sorties. Le serveur décide de leurs coups et applique un seul pas par commande protégée par version. Un navigateur humain peut demander le prochain pas, sans choisir les mouvements à la place du bot.
 
 La variante TOCK et les cartes 13 ne sont pas activées.
+
+## Aide des bots et indications de tour
+
+La strategie prefere les coups sans capture de ses propres pions ou de ceux du partenaire. Cela ne change pas la legalite des coups : si aucune alternative ne l'evite, une capture alliee reste obligatoire. Le partage d'une carte de demarrage au partenaire utilise uniquement sa situation publique sur le plateau, jamais sa main cachee.
+
+Pendant l'echange, le premier joueur est celui apres le distributeur. Pour la prochaine donne, le distributeur avancera d'une place, et le premier joueur sera celui apres ce nouveau distributeur. L'indicateur A suivre ignore les mains deja vides ; il est recalcule apres chaque coup.

@@ -63,7 +63,10 @@ export async function POST(request: Request) {
     // Do not log tokens, request bodies, hands, IPs, or database errors.
     if (status === 500) console.error('game_api_unexpected_error');
     return NextResponse.json(
-      { error: e instanceof HttpError ? e.message : 'Erreur interne. Réessayez.' },
+      {
+        error: e instanceof HttpError ? e.message : 'Erreur interne. Réessayez.',
+        code: e instanceof HttpError ? e.code : undefined,
+      },
       { status, headers: { ...headers, ...(status === 429 ? { 'Retry-After': '60' } : {}) } },
     );
   }

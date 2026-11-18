@@ -40,6 +40,16 @@ const move = z.discriminatedUnion('kind', [
 ]);
 const version = z.number().int().nonnegative();
 export const commandSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('leave'), code, version, connection: z.uuid() }).strict(),
+  z
+    .object({
+      type: z.literal('presence'),
+      code,
+      version,
+      connection: z.uuid(),
+      active: z.boolean(),
+    })
+    .strict(),
   z.object({ type: z.literal('list') }).strict(),
   z
     .object({ type: z.literal('kick'), code, version, seat: z.number().int().min(1).max(7) })

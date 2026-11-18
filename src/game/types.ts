@@ -22,6 +22,23 @@ export type Move =
   | { kind: 'move'; piece: string; steps: number; home?: boolean }
   | { kind: 'swap'; piece: string; target: string };
 export type Play = { cardIndex: number; moves: Move[]; as?: BaseCard };
+export type PieceChange = {
+  piece: string;
+  color: number;
+  from: number;
+  to: number;
+  captured: boolean;
+  step: number;
+};
+export type TurnRecord = {
+  id: number;
+  round: number;
+  actor: number;
+  card: Card | null;
+  as?: BaseCard;
+  kind: 'play' | 'discard' | 'discard-hand';
+  changes: PieceChange[];
+};
 export type Game = {
   players: Player[];
   pieces: Piece[];
@@ -36,6 +53,7 @@ export type Game = {
   log: string[];
   round: number;
   jokers?: boolean;
+  history?: TurnRecord[];
 };
 export type View = Omit<Game, 'hands' | 'deck' | 'exchanges'> & {
   hand: Card[];

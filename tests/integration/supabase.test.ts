@@ -51,6 +51,30 @@ test(
         null,
       );
       for (const client of [anon, ...users]) {
+        assert.ok((await client.from('room_presence').select('*').eq('room_code', code)).error);
+        assert.ok(
+          (
+            await client.rpc('touch_room_presence', {
+              p_code: code,
+              p_user: ids[0],
+              p_connection: randomUUID(),
+              p_version: 0,
+              p_active: true,
+            })
+          ).error,
+        );
+        assert.ok(
+          (
+            await client.rpc('leave_game_room', {
+              p_code: code,
+              p_user: ids[0],
+              p_connection: randomUUID(),
+              p_version: 0,
+              p_state: state,
+            })
+          ).error,
+        );
+
         assert.ok((await client.from('room_messages').select('*').eq('room_code', code)).error);
         assert.ok(
           (
@@ -197,6 +221,78 @@ test(
         (await admin.rpc('list_public_rooms')).data.some((r: { code: string }) => r.code === code),
         false,
       );
+      const connection = randomUUID(),
+        secondConnection = randomUUID();
+      const touch = {
+        p_code: code,
+        p_user: ids[0],
+        p_connection: connection,
+        p_version: 5,
+        p_active: true,
+      };
+      assert.ok((await admin.rpc('touch_room_presence', { ...touch, p_user: ids[1] })).error);
+      assert.equal(
+        (await admin.rpc('touch_room_presence', { ...touch, p_version: 4 })).data,
+        false,
+      );
+      assert.equal((await admin.rpc('touch_room_presence', touch)).data, true);
+      assert.equal(
+        (
+          await admin.rpc('touch_room_presence', {
+            ...touch,
+            p_connection: secondConnection,
+            p_active: false,
+          })
+        ).data,
+        true,
+      );
+      const heartbeatRows = await admin
+        .from('room_presence')
+        .select('active')
+        .eq('room_code', code);
+      assert.equal(heartbeatRows.data?.length, 2);
+      assert.equal(heartbeatRows.data?.filter((r) => r.active).length, 1);
+      assert.equal(
+        (await admin.from('game_rooms').select('version').eq('code', code).single()).data?.version,
+        5,
+      );
+      const departure = {
+        p_code: code,
+        p_user: ids[0],
+        p_connection: connection,
+        p_version: 5,
+        p_state: { ...kicked, public: false },
+      };
+      assert.ok((await admin.rpc('leave_game_room', { ...departure, p_user: ids[1] })).error);
+      const concurrentLeaves = await Promise.all([
+        admin.rpc('leave_game_room', departure),
+        admin.rpc('leave_game_room', departure),
+      ]);
+      assert.ok(concurrentLeaves.every((r) => !r.error));
+      assert.equal(concurrentLeaves.filter((r) => r.data === true).length, 1);
+      assert.deepEqual(
+        (await admin.from('room_presence').select('connection_id').eq('room_code', code)).data,
+        [{ connection_id: secondConnection }],
+      );
+      assert.equal(
+        (
+          await admin.rpc('leave_game_room', {
+            ...departure,
+            p_version: 6,
+            p_state: { ...kicked, people: [], closed: true, public: false },
+          })
+        ).data,
+        true,
+      );
+      assert.deepEqual(
+        (await admin.from('room_presence').select('*').eq('room_code', code)).data,
+        [],
+      );
+      assert.deepEqual(
+        (await users[0].from('room_events').select('*').eq('room_code', code)).data,
+        [],
+      );
+      assert.ok((await admin.rpc('touch_room_presence', { ...touch, p_version: 7 })).error);
       const limits = await Promise.all(
         Array.from({ length: 5 }, () =>
           admin.rpc('consume_rate_limit', { p_key: rateKey, p_max: 2, p_seconds: 60 }),

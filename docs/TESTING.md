@@ -14,7 +14,7 @@ La suite couvre : configurations 2/3/4/6/8, distribution, échange simultané, p
 
 ## Intégration Supabase
 
-Exclusivement sur un projet de test où les trois migrations ont été appliquées. Ajouter `RUN_SUPABASE_INTEGRATION=1` au fichier `.env.local` puis :
+Exclusivement sur un projet de test où les quatre migrations ont été appliquées. Ajouter `RUN_SUPABASE_INTEGRATION=1` au fichier `.env.local` puis :
 
 ```sh
 node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts
@@ -71,3 +71,23 @@ Resultats de cette livraison :
 - `node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` : un test ignore, car RUN_SUPABASE_INTEGRATION n'est pas active. Aucun acces multijoueur reel valide.
 - Recette navigateur non executee : acces localhost du navigateur integre en timeout, puis connexion au navigateur Windows expiree. Aucun resultat visuel bureau/mobile revendique pour ces changements.
 - Migration 003 non appliquee et version non deployee. Appliquer les migrations manquantes sur un projet de test, executer l'integration et la recette ci-dessus avant publication.
+
+## Depart, presence et orientation - 18 novembre 2026
+
+Nouveaux tests locaux : depart de membre/tiers, transfert d'hote et fermeture du dernier siege humain ; preservation du jeu commence pour reprise ; distinction d'une erreur temporaire et d'une perte d'acces ; interdiction de rejouer un coup apres renouvellement ; schema strict des signaux et du depart ; stockage local borne des codes ; depart en bas et geometrie dans le cadre pour toutes les couleurs et configurations, sans mutation du jeu.
+
+La suite Supabase est etendue aux privileges de room_presence, aux RPC interdites pour membre/tiers/anonyme, a la version obsolete, aux connexions multiples, au CAS concurrent des departs et au retrait en cascade de la presence. Recette navigateur restante : accueil et pseudo, fiche propre en premier, coequipier sous pseudo, rotation et cibles tactiles, mobile 390 px/bureau, changement de table, reprise, deux utilisateurs et onglets, reconnexion apres coup, et 7 fractionne. Les tentatives de navigateur integre local ont expire ; le controle Firefox a retourne unknown or expired node_repl continuation. Aucun nouveau rendu visuel valide.
+
+Resultats executes pour cette livraison : `npm run check` reussi (38 tests et TypeScript), puis `npm run build` reussi, puis `npm run format:check` reussi. La commande `node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` a ignore son unique test car RUN_SUPABASE_INTEGRATION n'est pas active. Migration 004 non appliquee et version non deployee. Aucun diagnostic de la deconnexion reelle ne peut etre conclu de ces tests locaux.
+
+## Plantage, bots et historique - 18 novembre 2026
+
+Reproduction avant correction : le test `plateau : un apercu du tour precedent ne plante pas apres une entree en maison` echouait avec TypeError is not iterable dans board.tsx. Apres une entree en maison, le nouveau plateau recevait encore l'ancien apercu et calculait une case de maison hors limites. Le filtre des apercus courants et la verification de coordonnee corrigent ce scenario. La correspondance avec le chunk de production n'a pas pu etre verifiee (ressource distante inaccessible), donc ce test ne prouve pas que toutes les causes du signalement sont resolues.
+
+React 418 designe une divergence d'hydratation (https://react.dev/errors/418). Le premier rendu est teste deterministe, sans lecture du stockage ou de session avant montage. Cela ne remplace pas une reproduction avec navigateur et extensions ; l'erreur 418 signalee reste a reproduire. GrowthBook est absent du code ; les messages CSP et cookie ne prouvent pas une perte de session Supabase.
+
+Nouveaux scenarios : bot evitant captures propres/alliees, capture forcee avec defausse interdite, capture en chemin du 7, don de demarrage au partenaire et conservation de sa seule sortie ; traces de permutation/capture, absence de champs prives, anciens etats sans historique, retentions de 40 coups ; ordre de jeu et nouvelle donne ; messages non lus par UUID meme a longueur de liste constante ; rendu initial deterministe.
+
+Recette restante : survol et clavier de l'historique, dialogue mobile et Echap, fleches apres permutation et 7, lisibilite a 390 px, compteur chat sur deux clients, reception en arriere-plan, observation des bots locaux et rechargement apres erreur. Le controle navigateur etait bloque dans cette session (timeout du navigateur integre et continuation Firefox expiree) ; aucun nouveau controle visuel n'est revendique. Pas de changement de frontiere SQL dans cette livraison ; les integrations Supabase des migrations precedentes restent a executer sur le projet de test.
+
+Resultats de cette iteration : `npm run check` reussi (48 tests, TypeScript strict), `npm run build` reussi et `npm run format:check` reussi. Le test de plantage a ete observe en echec avant correction puis en succes. Pas de deploiement effectue. Cette iteration n'ajoute pas de migration ; la migration 004 des changements precedents reste necessaire a la version complete.

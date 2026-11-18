@@ -9,6 +9,8 @@ import {
   type Play,
   type Player,
   type View,
+  type PieceChange,
+  type TurnRecord,
 } from './types';
 
 export class RuleError extends Error {}
@@ -128,7 +130,7 @@ export function exchange(given: Game, actor: number, index: number): Game {
   }
   return g;
 }
-export function activeColors(g: Game, actor: number): number[] {
+export function activeColors(g: Pick<Game, 'players' | 'pieces'>, actor: number): number[] {
   const player = g.players[actor];
   if (!player) return [];
   const done = (colors: number[]) =>
@@ -137,7 +139,12 @@ export function activeColors(g: Game, actor: number): number[] {
     return g.players.find((p) => p.id !== player.id && p.team === player.team)!.colors;
   return player.colors;
 }
-function execute(g: Game, actor: number, move: Move, eatPath: boolean): void {
+function execute(
+  g: Pick<Game, 'players' | 'pieces'>,
+  actor: number,
+  move: Move,
+  eatPath: boolean,
+): void {
   const length = trackLength(g),
     colors = activeColors(g, actor);
   const p = g.pieces.find((p) => p.id === move.piece);
@@ -206,7 +213,7 @@ function execute(g: Game, actor: number, move: Move, eatPath: boolean): void {
   p.stake = false;
 }
 function candidates(
-  g: Game,
+  g: Pick<Game, 'players' | 'pieces'>,
   actor: number,
   card: BaseCard,
   used: string[] = [],
@@ -236,7 +243,7 @@ function candidates(
   }
   return result.filter((m) => {
     try {
-      execute(structuredClone(g), actor, m, card === 7);
+      execute(structuredClone({ players: g.players, pieces: g.pieces }), actor, m, card === 7);
       return true;
     } catch {
       return false;
@@ -257,7 +264,12 @@ export function legalPlays(g: Game, actor: number, onlyFirst = false): Play[] {
           if (onlyFirst) return output;
         }
       } else {
-        const visit = (state: Game, moves: Move[], remaining: number, color?: number): boolean => {
+        const visit = (
+          state: Pick<Game, 'players' | 'pieces'>,
+          moves: Move[],
+          remaining: number,
+          color?: number,
+        ): boolean => {
           if (!remaining) {
             output.push({ cardIndex: index, moves, ...identity });
             return onlyFirst;
@@ -271,7 +283,7 @@ export function legalPlays(g: Game, actor: number, onlyFirst = false): Play[] {
             color,
           )) {
             if (m.kind !== 'move') continue;
-            const next = structuredClone(state);
+            const next = structuredClone({ players: state.players, pieces: state.pieces });
             execute(next, actor, m, true);
             if (
               visit(
@@ -291,6 +303,43 @@ export function legalPlays(g: Game, actor: number, onlyFirst = false): Play[] {
   }
   return output;
 }
+// Simulation from public board data only, shared by bot evaluation and history.
+export function simulateMoves(
+  board: Pick<Game, 'players' | 'pieces'>,
+  actor: number,
+  moves: Move[],
+  eatPath: boolean,
+) {
+  const state = structuredClone({ players: board.players, pieces: board.pieces });
+  const changes: PieceChange[] = [];
+  const allowed = activeColors(board, actor);
+  moves.forEach((move, step) => {
+    requireRule(
+      allowed.includes(state.pieces.find((p) => p.id === move.piece)?.color ?? -1),
+      'Couleur interdite.',
+    );
+    const before = state.pieces.map((p) => ({ ...p }));
+    execute(state, actor, move, eatPath);
+    state.pieces.forEach((p, i) => {
+      if (p.position !== before[i].position)
+        changes.push({
+          piece: p.id,
+          color: p.color,
+          from: before[i].position,
+          to: p.position,
+          captured: p.position === -1,
+          step,
+        });
+    });
+  });
+  return { pieces: state.pieces, changes };
+}
+function rememberTurn(g: Game, entry: Omit<TurnRecord, 'id' | 'round'>) {
+  g.history = [
+    { ...entry, round: g.round, id: (g.history?.[0]?.id ?? 0) + 1 },
+    ...(g.history ?? []),
+  ].slice(0, 40);
+}
 export function play(given: Game, actor: number, action: Play, random: () => number): Game {
   requireRule(given.phase === 'play' && given.turn === actor, "Ce n'est pas votre tour.");
   const g = structuredClone(given),
@@ -306,6 +355,7 @@ export function play(given: Game, actor: number, action: Play, random: () => num
     'Valeur du Joker invalide.',
   );
   const card = printed === 'joker' ? action.as : printed;
+  let changes: PieceChange[] = [];
   if (!action.moves.length)
     requireRule(
       legalPlays(g, actor, true).length === 0,
@@ -339,18 +389,19 @@ export function play(given: Game, actor: number, action: Play, random: () => num
         'Cette action ne correspond pas à la carte.',
       );
     }
-    // Freeze control for the complete card: helping a partner starts next turn.
-    const allowed = activeColors(given, actor);
-    for (const m of action.moves) {
-      requireRule(
-        allowed.includes(g.pieces.find((p) => p.id === m.piece)?.color ?? -1),
-        'Couleur interdite.',
-      );
-      execute(g, actor, m, card === 7);
-    }
+    const simulation = simulateMoves(g, actor, action.moves, card === 7);
+    g.pieces = simulation.pieces;
+    changes = simulation.changes;
   }
   g.hands[actor].splice(action.cardIndex, 1);
   g.discard.push(printed);
+  rememberTurn(g, {
+    actor,
+    card: printed,
+    ...(action.as === undefined ? {} : { as: action.as }),
+    kind: action.moves.length ? 'play' : 'discard',
+    changes,
+  });
   g.log.unshift(
     `${g.players[actor].name} ${action.moves.length ? 'joue' : 'défausse'} ${printed === 'joker' ? `Joker${card === undefined ? '' : ` (${card})`}` : card === 'swap' ? 'Permutation' : card}.`,
   );
@@ -390,6 +441,7 @@ export function discardHand(given: Game, actor: number, random: () => number): G
   const g = structuredClone(given);
   g.discard.push(...g.hands[actor]);
   g.hands[actor] = [];
+  rememberTurn(g, { actor, card: null, kind: 'discard-hand', changes: [] });
   g.log.unshift(`${g.players[actor].name} défausse sa main.`);
   g.log = g.log.slice(0, 30);
   advanceTurn(g, random);

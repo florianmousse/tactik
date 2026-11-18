@@ -57,3 +57,9 @@ Références : [erreurs Auth Supabase](https://supabase.com/docs/guides/auth/deb
 5. Vérifier une défausse complète sans démarrage, puis son refus avec un pion bloqué derrière un pieu.
 
 Les bots avancent quand un membre du salon est connecté. Ils ne nécessitent pas de processus permanent sur Vercel. Si tous les navigateurs sont fermés, la partie reprend au prochain retour.
+
+## Presence, depart et reprise
+
+Appliquer `supabase/migrations/202611180004_presence_leave.sql` apres les migrations 001, 002 et 003, avant de deployer cette version. La nouvelle projection lit room_presence ; sans cette migration, elle retourne une erreur de service explicite. Aucun changement de variable ni de secret. Ne pas rejouer une migration deja appliquee.
+
+Tester sur un projet de test : depart du createur avant lancement, fermeture du dernier siege humain, depart/reprise en cours, deux onglets du meme membre, passage en arriere-plan, expiration de presence, exclusion suivie d'une tentative de signal, perte reseau apres un coup et deux commandes concurrentes. Appliquer ensuite la meme migration au projet de deploiement et publier le code sur Vercel.

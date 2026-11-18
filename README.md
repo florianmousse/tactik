@@ -69,7 +69,7 @@ Le navigateur envoie une intention. Le serveur vérifie identité, appartenance,
 
 ## Configuration
 
-Pour une première installation, suivre [DEPLOYMENT.md](docs/DEPLOYMENT.md). Pour le site existant, suivre [UPGRADE.md](docs/UPGRADE.md). Les trois migrations sont nécessaires, dans l'ordre ; ne pas réexécuter la première si elle est déjà appliquée.
+Pour une première installation, suivre [DEPLOYMENT.md](docs/DEPLOYMENT.md). Pour le site existant, suivre [UPGRADE.md](docs/UPGRADE.md). Les quatre migrations sont nécessaires, dans l'ordre ; ne pas réexécuter la première si elle est déjà appliquée.
 
 Copier `.env.example` vers `.env.local` seulement si le fichier local n'existe pas. Ne jamais placer des secrets dans le fichier d'exemple, même temporairement.
 
@@ -114,3 +114,23 @@ Appliquer aussi `supabase/migrations/202611180003_public_rooms.sql` avant de met
 Les nouvelles invitations ont 8 caracteres sans I, O, 0 ou 1 ; les anciens codes a 12 caracteres restent valables. Le createur peut exclure un invite avant le lancement. Cette identite ne peut plus rejoindre ce salon, lire son chat ni recevoir ses signaux.
 
 Un coup simple demande carte, pion, puis une seule confirmation. Les destinations sont affichees sur le plateau ; les choix de maison et les segments du 7 restent explicites. Pour permuter, choisir son pion puis le pion cible directement sur le plateau, ou utiliser les boutons nommes. Le chat se replie avec son bouton et reste dans le panneau lateral sur mobile. Un bandeau rappelle vos couleurs, votre equipe et votre partenaire.
+
+## Quitter, reprendre et voir la presence
+
+Le bouton Quitter la table est disponible en ligne et en solo. Avant le lancement, il libere le siege ; si le createur part, le premier humain restant devient hote. Le dernier humain ferme le salon. En cours de partie, quitter conserve la place, les cartes et les equipes : la partie attend toujours le joueur dont c'est le tour. Il peut rejoindre une autre table puis revenir avec Mes parties recentes (huit salons maximum sur ce navigateur).
+
+La reprise utilise la session Supabase existante, jamais le pseudo comme preuve d'identite. Une erreur de reseau ou d'origine ne supprime plus la table ni son lien. Reprendre / synchroniser relit l'etat, sans rejouer un coup dont la sauvegarde est incertaine. Si la session anonyme a ete effacee, un pseudo identique ne permet pas de recuperer une place ; garder le meme navigateur et profil.
+
+La migration `202611180004_presence_leave.sql` ajoute la presence privee : Present, En arriere-plan, Absent et Bot. Un signal est envoye toutes les 15 secondes tant que la table est visible, et lors des changements de visibilite. Sans signal pendant 45 secondes, le joueur est considere absent lors de la prochaine lecture (jusqu'a 15 secondes de delai supplementaire). Ce statut ne mesure pas les clics ni l'attention du joueur. Plusieurs onglets sont pris en compte.
+
+Votre fiche apparait en premier, avec votre coequipier sous votre pseudo. Le plateau tourne pour placer votre zone de depart dans sa moitie basse ; les coordonnees logiques et l'ordre des tours ne changent pas. Les reserves bleue et verte sont verticales comme les rouge et jaune.
+
+## Observation, bots et historique
+
+Le chat signale les nouveaux messages des autres joueurs par un compteur de non-lus et un bandeau lorsque le panneau est ferme. Les messages sont marques lus uniquement lorsque le chat est visible dans un onglet actif. Pas de son ni de notification systeme.
+
+Les bots simulent les coups legaux avec les seules positions publiques et leur main : ils preferent les alternatives sans capture alliee, y compris sur le passage d'un 7. Si les regles imposent une capture de soi, ils doivent toutefois jouer. Ils evaluent sorties, progression, maisons, permutations et captures adverses. A l'echange, ils peuvent donner un 1 ou un 10 au partenaire encore en reserve, en conservant une sortie si necessaire. Il s'agit d'une heuristique, pas d'une recherche strategique exhaustive.
+
+L'option Observer les cartes des bots est disponible uniquement en entrainement local, avant et pendant la partie. Elle ne change pas ce que les bots voient eux-memes et n'existe pas dans le protocole en ligne.
+
+L'historique conserve les 40 derniers coups avec leurs positions publiques. Survol, focus clavier ou toucher affiche depart et arrivee, permutations et captures. Agrandir l'historique ouvre un dialogue avec plateau defilable, boutons lisibles et fermeture par Echap. Les parties anciennes restent compatibles : seuls leurs nouveaux coups ont une trace geometrique. Les textes d'evenements precedents restent consultables. Les indicateurs distinguent la personne qui joue ensuite et celle qui commencera la prochaine donne.

@@ -87,7 +87,11 @@ export function boardLayout(game: Pick<Game, 'players'>): BoardLayout {
       sector === 0 ? [152, 240 - i * 40] : [start[0] + i * 40, 160],
     );
     const reserve = Array.from({ length: 4 }, (_, i): Point =>
-      sector === 0 ? [63, 210 + i * 20] : [start[0] - 30 + i * 20, 210],
+      sector === 0
+        ? [63, 210 + i * 20]
+        : sector === count / 2 - 1
+          ? [width - 192, 210 + i * 20]
+          : [start[0] - 30 + i * 20, 210],
     );
     homes[order[sector]] = home;
     reserves[order[sector]] = reserve;
@@ -101,5 +105,20 @@ export function boardLayout(game: Pick<Game, 'players'>): BoardLayout {
     homes,
     reserves,
     seams: Array.from({ length: middle + 1 }, (_, i) => 292 + i * 400),
+  };
+}
+
+// Rotate the whole board, including hit targets, so the viewer sits at the bottom.
+export function boardOrientation(game: Pick<Game, 'players'>, color: number) {
+  const layout = boardLayout(game);
+  const sector = colorOrder(game).indexOf(color);
+  const half = colorCount(game) / 2;
+  const side = sector % half;
+  const angle = (side === 0 ? -90 : side === half - 1 ? 90 : 180) + (sector >= half ? 180 : 0);
+  const sideways = Math.abs(angle % 180) === 90;
+  return {
+    angle,
+    width: sideways ? layout.height : layout.width,
+    height: sideways ? layout.width : layout.height,
   };
 }

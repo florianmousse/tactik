@@ -63,3 +63,15 @@ Les clés locales restent dans `.env.local`, ignoré par Git. `.env.example` con
 La migration 003 ne donne aucun droit client supplementaire et ne publie aucune nouvelle table. La liste passe par une RPC reservee a service_role et expose seulement les metadonnees d'accueil des salons opt-in. Les codes courts gardent 40 bits de hasard cryptographique et restent soumis aux quotas de jonction. Les anciens codes hexadecimaux de 12 caracteres sont acceptes.
 
 L'exclusion supprime atomiquement l'appartenance avec le CAS. Le compte exclu perd lecture, chat et Realtime ; son identite est conservee uniquement dans l'etat prive pour refuser sa reentree. Les tests SQL de retrait des droits doivent etre executes sur un projet de test avant publication.
+
+## Presence et depart
+
+`room_presence` est sous RLS sans privilege client. Les RPC de presence et depart sont exclusivement service_role, security invoker et search_path vide. Aucun ajout a Realtime. Le serveur derive l'UUID utilisateur du JWT, verifie l'appartenance et la version, et genere la date de derniere presence en base. Le client peut declarer uniquement sa propre visibilite, pas celle d'un autre utilisateur. Une presence n'est pas une preuve d'activite humaine.
+
+Le depart avant lancement retire l'appartenance par CAS et ses lignes de presence par cascade. Le depart d'une partie commencee garde volontairement l'appartenance pour permettre la reprise. Aucun transfert de place par pseudo, aucune recreation automatique de session pour reprendre une partie. La liste locale des parties recentes contient seulement des codes, jamais cartes, tokens ou etats complets.
+
+## Observation locale et traces
+
+L'affichage des cartes des bots est exclusivement local : aucune option de commande HTTP ni aucun champ de projection en ligne ne permet de le demander. Les traces de coups ne stockent que des cartes deja jouees et des positions publiques, sans choix d'echange ou cartes des defausses completes. Elles restent reservees aux membres via viewFor et ne sont jamais publiees sur Realtime.
+
+Les erreurs fournies par le navigateur mentionnent GrowthBook, absent du code et des dependances du projet. La CSP n'est pas elargie pour autoriser cette requete. Les messages techniques bruts, etats et identites ne sont pas ajoutes aux logs par l'ecran de recuperation.

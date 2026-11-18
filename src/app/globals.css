@@ -906,6 +906,208 @@ legend {
 .destination {
   cursor: pointer;
 }
+.chat-notification {
+  flex-shrink: 0;
+  background: #fff1cb;
+  border: 2px solid #b47a18;
+  margin-top: 8px;
+  font-weight: bold;
+  text-align: left;
+}
+.tabs .has-unread {
+  background: #fff1cb;
+  border-color: #b47a18;
+  font-weight: bold;
+}
+.turn-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.turn-order b {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.turn-order i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #555;
+  border-radius: 50%;
+}
+.training-options {
+  padding: 6px;
+}
+.bot-hands {
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 240px;
+  flex-shrink: 0;
+}
+.bot-hands h2 {
+  font-size: 16px;
+}
+.bot-cards {
+  display: flex;
+  gap: 6px;
+  margin: 5px 0 12px;
+  flex-wrap: wrap;
+}
+.bot-cards span {
+  padding: 7px 10px;
+  border: 1px solid #bfb39c;
+  border-radius: 5px;
+  background: #fffdf6;
+  font-size: 18px;
+}
+.history-panel {
+  min-height: 0;
+  overflow: auto;
+  font-size: 14px;
+}
+.history-tools {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.history-list {
+  display: grid;
+  gap: 8px;
+}
+.history-list button {
+  text-align: left;
+  display: grid;
+  gap: 5px;
+  line-height: 1.5;
+  font-size: 14px;
+  padding: 12px;
+}
+.history-list .selected {
+  border: 2px solid #145b91;
+  background: #e8f1f8;
+}
+.history-list small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.history-dialog {
+  width: min(1100px, 96vw);
+  max-height: 94dvh;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.history-dialog::backdrop {
+  background: #17221caa;
+}
+.history-dialog > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  position: sticky;
+  top: -16px;
+  background: var(--paper);
+  z-index: 1;
+  padding: 8px 0;
+}
+.history-replay {
+  height: 48dvh;
+  overflow: auto;
+  border: 1px solid var(--line);
+}
+.history-replay .board {
+  min-width: 650px;
+  height: auto;
+  min-height: 450px;
+}
+.recovery-page {
+  padding: 40px 24px;
+}
+.recovery-page button {
+  margin: 6px;
+}
+.nickname-input {
+  width: 100%;
+}
+.nickname-label {
+  font-size: 16px !important;
+}
+.recent-rooms {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.recent-rooms button {
+  margin: 4px;
+}
+.player.self {
+  border: 2px solid var(--green);
+  background: #edf3e6;
+  max-width: 330px;
+}
+.partner-label {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.player small {
+  flex-basis: 100%;
+}
+.presence {
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.presence::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #91958e;
+}
+.presence.online::before {
+  background: #26833b;
+}
+.presence.away::before {
+  background: #bb7a13;
+}
+.connection-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 5px 0;
+}
+.connection-status button {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+@media (max-width: 760px) {
+  .players {
+    max-height: 115px;
+  }
+  .player.self {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+  .partner-label {
+    font-size: 11px;
+  }
+}
 @media (max-width: 760px) {
   .team-identity {
     font-size: 10px;
@@ -918,5 +1120,85 @@ legend {
   .game-sidebar {
     overflow: auto;
     flex-shrink: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .playing {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .game-layout {
+    overflow: visible;
+  }
+  .table-area {
+    flex: none;
+    min-height: 0;
+  }
+  .board-stage {
+    flex: none;
+    height: 52dvh;
+    min-height: 330px;
+  }
+  .game-sidebar {
+    max-height: none;
+    overflow: visible;
+    flex: none;
+  }
+  .turn-controls,
+  .game-sidebar:has(.chat-panel) .turn-controls {
+    max-height: none;
+  }
+  .move-editor {
+    max-height: 240px;
+    font-size: 14px;
+  }
+  .piece-choices button,
+  .move-options button,
+  .turn-buttons > button {
+    font-size: 13px;
+    min-height: 44px;
+  }
+  .session-panel,
+  .session-panel:has(.chat-panel) {
+    max-height: none;
+    min-height: 48px;
+  }
+  .session-panel .tabs button {
+    font-size: 13px;
+    min-height: 44px;
+  }
+  .session-panel .history-panel {
+    max-height: 420px;
+  }
+  .session-panel .message-list {
+    max-height: 280px;
+  }
+  .turn-order {
+    font-size: 12px;
+  }
+  .player b,
+  .player small {
+    font-size: 12px;
+  }
+  .players {
+    max-height: 155px;
+  }
+  .history-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    padding: 12px;
+  }
+  .history-dialog > header {
+    top: -12px;
+  }
+  .history-list button {
+    min-height: 60px;
+    font-size: 15px;
   }
 }

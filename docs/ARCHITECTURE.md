@@ -60,7 +60,7 @@ Les numéros de couleur sont stables (rouge, jaune, bleu, vert, noir, blanc, vio
 
 ## Reconnexion et sessions
 
-Supabase conserve la session anonyme dans le stockage du navigateur et rafraîchit son jeton. Après actualisation, ouvrir l'invitation et rejoindre restitue la place existante si le même utilisateur est identifié. Le code du salon doit être conservé ; il n'existe pas encore de liste des anciennes parties.
+Supabase conserve la session anonyme dans le stockage du navigateur et rafraîchit son jeton. Après actualisation, ouvrir l'invitation et rejoindre restitue la place existante si le même utilisateur est identifié. Les huit derniers codes ouverts sont conserves localement pour la reprise avec la meme session ; aucune main n'est stockee dans cette liste.
 
 La requête `join` est idempotente pour un membre existant. L'identité ne dépend pas du pseudo, du code seul, de l'adresse IP ni d'un index de siège client. La perte du stockage local nécessite une nouvelle partie si la précédente est déjà commencée.
 
@@ -85,3 +85,19 @@ Les bots sont des sièges du salon, jamais des identités Auth. Seul l'hôte les
 `kick` exige hote, salon non commence, siege invite humain et version attendue. Le commit CAS retire aussi les anciens `room_members` dans la meme transaction. `banned` reste serveur uniquement et bloque une nouvelle jonction par cette identite. Le chat verrouille la ligne salon avant de verifier l'appartenance pour serialiser ses envois avec une exclusion. Les salons historiques sans `public` restent prives.
 
 `move-preview.ts` calcule uniquement des reperes graphiques a partir des mouvements deja autorises dans la projection. Cette aide ne remplace jamais la validation serveur.
+
+## Cycle de vie et presence (migration 004)
+
+`leave` exige identite, appartenance, version et UUID de connexion de l'onglet. Le serveur calcule le nouvel etat avec `leaveTable`, puis `leave_game_room` effectue un commit CAS et retire la presence de cet onglet dans la meme transaction. Avant lancement, le membre est retire, l'hote est transfere au premier humain restant (replace au premier siege), ou le salon est ferme sans humain. Apres lancement, l'etat du jeu et les membres sont conserves. Aucun bot ne remplace automatiquement un absent.
+
+`presence` exige les memes controles et un booleen de visibilite. `touch_room_presence` verrouille le salon, verifie version, expiration et appartenance puis enregistre une date serveur. Cette operation ne modifie pas la version du jeu. Elle retourne false si la version est obsolete : le client relit alors seulement l'etat. La presence est expiree apres 45 secondes et projetee sous forme de statut, sans date ni identifiant de connexion. Huit onglets maximum par membre/salon, nettoyage des lignes vieilles de deux minutes a chaque signal. La FK vers room_members efface les presences lors d'un retrait.
+
+Les lectures simultanees sont regroupees. Un compteur de navigation ignore les reponses anciennes apres avoir quitte ou change de table. Seuls les codes d'erreur NOT_MEMBER et ROOM_GONE renvoient automatiquement a l'accueil ; un 403 d'origine, un quota ou une panne ne retire pas le salon. Apres un 401, le client tente le renouvellement de session et ne rejoue automatiquement que sync/list. Une action de jeu n'est jamais rejouee automatiquement.
+
+## Traces publiques et evaluation des bots
+
+Le champ optionnel `Game.history` contient au plus 40 `TurnRecord` : identifiant croissant, donne, siege auteur, carte jouee (et valeur du Joker), type de coup et changements de positions. Chaque changement contient pion, couleur, depart, arrivee, segment et capture. Aucun snapshot de main, choix d'echange, pioche ou horodatage. Une defausse complete a `card: null`. Les anciens salons sans historique sont acceptes. Le CAS existant sauvegarde le coup et sa trace ensemble ; pas de nouvelle migration SQL pour ce champ JSON optionnel.
+
+`simulateMoves` clone seulement joueurs et positions, execute les memes transitions pures que le moteur et retourne les positions et changements. Les bots l'utilisent depuis leur projection privee, sans reconstituer les mains adverses. Les captures alliees sont comparees avant les autres scores, donc une option sans capture alliee est toujours preferee. Une capture obligatoire reste autorisee par les regles.
+
+Le plateau filtre les apercus contre les mouvements de la projection courante avant de calculer une coordonnee. Cette verification evite le rendu transitoire d'un ancien mouvement sur un nouvel etat, avant les effets React de remise a zero. Les traces historiques utilisent leurs positions enregistrees, jamais un recalcul a partir du plateau courant.

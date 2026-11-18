@@ -4,15 +4,22 @@ import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import type { Session } from '@supabase/supabase-js';
 import { createGame, discardHand, exchange, play, viewFor } from '@/game/engine';
 import { pendingBot, stepBot } from '@/game/bots';
-import type { Capacity, Game, Play, Move } from '@/game/types';
+import type { Capacity, Game, Play, Move, TurnRecord } from '@/game/types';
 import type { RoomView, PublicRoom } from '@/game/room';
 import type { Command } from '@/server/schema';
 import { configurationIssue, onlineConfigured, supabase } from '@/lib/supabase';
 import { authErrorMessage, captchaErrorMessage } from '@/lib/auth-errors';
 import { ApiError, requestGame } from '@/lib/game-api';
-import { Board, PALETTE, COLOR_NAMES } from './board';
+import { Board } from './board';
 import { TurnControls } from './turn-controls';
 import { Chat } from './chat';
+import { HistoryPanel } from './history-panel';
+import { BotHands } from './bot-hands';
+import { TurnOrder } from './turn-order';
+import { unreadMessages } from '@/lib/chat-unread';
+import { PlayerList, PRESENCE_LABELS } from './player-list';
+import { parseRecentRooms, rememberRoom } from '@/lib/recent-rooms';
+import { canRetryAfterRefresh, hasLostRoomAccess } from '@/lib/room-connection';
 
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 export function GameApp() {
@@ -29,7 +36,7 @@ export function GameApp() {
     piece: () => {},
     move: () => {},
   });
-  const [tab, setTab] = useState<'create' | 'join'>('create'),
+  const [tab, setTab] = useState<'create' | 'join' | 'public'>('public'),
     [panel, setPanel] = useState<'log' | 'chat' | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -46,7 +53,122 @@ export function GameApp() {
   const captchaRef = useRef<TurnstileInstance>(null),
     captchaToken = useRef(captcha);
   captchaToken.current = captcha;
+  const [showBotHands, setShowBotHands] = useState(false);
+  const [historyPreview, setHistoryPreview] = useState<TurnRecord | null>(null);
+  const [chatSeen, setChatSeen] = useState<{ code: string; ids: string[] } | null>(null);
+  const [pageVisible, setPageVisible] = useState(true);
+  const unread =
+    room && chatSeen?.code === room.code ? unreadMessages(room.messages, chatSeen.ids) : [];
+  useEffect(() => {
+    const change = () => setPageVisible(document.visibilityState === 'visible');
+    change();
+    document.addEventListener('visibilitychange', change);
+    return () => document.removeEventListener('visibilitychange', change);
+  }, []);
+  useEffect(() => {
+    if (!room) {
+      setChatSeen(null);
+      return;
+    }
+    let ids = room.messages.map((m) => m.id);
+    try {
+      const stored: unknown = JSON.parse(
+        localStorage.getItem(`taktik-chat-${room.code}`) ?? 'null',
+      );
+      if (Array.isArray(stored))
+        ids = stored.filter((id): id is string => typeof id === 'string').slice(-100);
+    } catch {
+      /* Storage may be disabled. */
+    }
+    setChatSeen({ code: room.code, ids });
+  }, [room?.code]);
+  const messageKey = room?.messages.map((m) => m.id).join(',') ?? '';
+  useEffect(() => {
+    if (!room || !pageVisible || (room.game && panel !== 'chat')) return;
+    const ids = room.messages.map((m) => m.id);
+    setChatSeen({ code: room.code, ids });
+    try {
+      localStorage.setItem(`taktik-chat-${room.code}`, JSON.stringify(ids));
+    } catch {
+      /* Storage may be disabled. */
+    }
+  }, [messageKey, room?.code, panel, pageVisible, Boolean(room?.game)]);
   const alive = useRef(true);
+  const generation = useRef(0);
+  const roomRef = useRef(room);
+  roomRef.current = room;
+  const connection = useRef<string | null>(null);
+  const syncing = useRef(false);
+  const [recentRooms, setRecentRooms] = useState<string[]>([]);
+  const [connectionState, setConnectionState] = useState<'ok' | 'reconnecting'>('ok');
+  const nameInput = useRef<HTMLInputElement>(null);
+  function saveRecent(code: string) {
+    setRecentRooms((previous) => {
+      const next = rememberRoom(code, previous);
+      try {
+        localStorage.setItem('taktik-recent-rooms', JSON.stringify(next));
+      } catch {
+        /* Storage may be disabled. */
+      }
+      return next;
+    });
+  }
+  function returnHome() {
+    generation.current++;
+    roomRef.current = null;
+    setRoom(null);
+    setLocal(null);
+    setPlayable([]);
+    setDestinations([]);
+    setSelectedPiece(undefined);
+    setPanel(null);
+    setHistoryPreview(null);
+    setTab('public');
+    setConnectionState('ok');
+    history.replaceState(null, '', location.pathname);
+  }
+  async function leaveCurrent() {
+    if (!room) {
+      returnHome();
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api({
+        type: 'leave',
+        code: room.code,
+        version: room.version,
+        connection: connection.current!,
+      });
+      if (result.resumable) saveRecent(room.code);
+      else
+        setRecentRooms((previous) => {
+          const next = previous.filter((c) => c !== room.code);
+          try {
+            localStorage.setItem('taktik-recent-rooms', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      returnHome();
+      setNotice(
+        result.resumable
+          ? 'Vous avez quitté la table. Votre place est conservée dans Mes parties récentes.'
+          : 'Vous avez quitté le salon. Votre place est libre.',
+      );
+    } catch (e) {
+      setError((e as Error).message);
+      if (e instanceof ApiError && e.status === 409) await synchronize(room.code);
+      else {
+        returnHome();
+        setNotice(
+          "Retour à l'accueil. Sans connexion, votre place reste conservée ; la présence expirera sous 45 secondes.",
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
   const view = useMemo(
     () => (local ? viewFor(local, 'local-0') : (room?.game ?? null)),
     [local, room?.game],
@@ -83,28 +205,71 @@ export function GameApp() {
       session = result.data.session;
     }
     if (!session) throw new Error('Session absente. Rejoindre le salon pour se connecter.');
-    return requestGame(command, session);
+    try {
+      return await requestGame(command, session);
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 401) throw e;
+      const refreshed = await client.auth.refreshSession();
+      if (refreshed.error || !refreshed.data.session)
+        throw new Error(
+          'Session interrompue. Gardez ce navigateur ouvert et reconnectez-vous. Votre place reste conservée.',
+        );
+      // Only reads can be replayed automatically. Never replay a move or a join.
+      if (canRetryAfterRefresh(command)) return requestGame(command, refreshed.data.session);
+      throw new ApiError(401, 'Session renouvelée. Synchronisez avant de refaire votre action.');
+    }
   }, []);
   const synchronize = useCallback(
-    async (roomCode: string) => {
+    async (roomCode: string, heartbeat = false) => {
+      if (syncing.current) return;
+      syncing.current = true;
+      const epoch = generation.current;
       try {
-        const next = await api({ type: 'sync', code: roomCode });
-        if (alive.current) receive(next);
-      } catch (e) {
-        if (alive.current) {
-          setError((e as Error).message);
-          if (e instanceof ApiError && (e.status === 403 || e.status === 404)) {
-            setRoom(null);
-            history.replaceState(null, '', location.pathname);
-          }
+        let next: RoomView;
+        const current = roomRef.current;
+        try {
+          next =
+            heartbeat && current?.code === roomCode && connection.current
+              ? await api({
+                  type: 'presence',
+                  code: roomCode,
+                  version: current.version,
+                  connection: connection.current,
+                  active: document.visibilityState === 'visible',
+                })
+              : await api({ type: 'sync', code: roomCode });
+        } catch (e) {
+          if (!(e instanceof ApiError) || e.status !== 409) throw e;
+          next = await api({ type: 'sync', code: roomCode });
         }
+        if (alive.current && epoch === generation.current) {
+          receive(next);
+          setConnectionState('ok');
+        }
+      } catch (e) {
+        if (alive.current && epoch === generation.current) {
+          setConnectionState('reconnecting');
+          setError((e as Error).message);
+          // Origin failures and transport errors must never erase the current table.
+          if (hasLostRoomAccess(e)) returnHome();
+        }
+      } finally {
+        syncing.current = false;
       }
     },
     [api, receive],
   );
   useEffect(() => {
     alive.current = true;
+    connection.current ??= crypto.randomUUID();
+    try {
+      setRecentRooms(parseRecentRooms(localStorage.getItem('taktik-recent-rooms')));
+      setName(localStorage.getItem('taktik-name') ?? '');
+    } catch {
+      /* Private browsing can disable storage. */
+    }
     const invitation = new URLSearchParams(location.search).get('salon');
+    const epoch = generation.current;
     if (invitation && /^(?:[A-Z2-9]{8}|[A-F0-9]{12})$/i.test(invitation)) {
       setCode(invitation.toUpperCase());
       setTab('join');
@@ -123,13 +288,13 @@ export function GameApp() {
         if (error) setError(authErrorMessage(error.code));
         if (session && invitation && /^(?:[A-Z2-9]{8}|[A-F0-9]{12})$/i.test(invitation)) {
           try {
-            const next = await requestGame(
-              { type: 'sync', code: invitation.toUpperCase() },
-              session,
-            );
-            if (alive.current) receive(next);
+            const next = await api({ type: 'sync', code: invitation.toUpperCase() });
+            if (alive.current && epoch === generation.current) {
+              receive(next);
+              saveRecent(next.code);
+            }
           } catch (e) {
-            if (alive.current && (!(e instanceof ApiError) || e.status !== 403))
+            if (alive.current && (!(e instanceof ApiError) || e.code !== 'NOT_MEMBER'))
               setError((e as Error).message);
           }
         }
@@ -149,7 +314,7 @@ export function GameApp() {
       alive.current = false;
       subscription.unsubscribe();
     };
-  }, [receive]);
+  }, [receive, api]);
   useEffect(() => {
     if (!room || local) return;
     const client = supabase(),
@@ -166,15 +331,22 @@ export function GameApp() {
         },
         () => void synchronize(roomCode),
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') void synchronize(roomCode, true);
+      });
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') void synchronize(roomCode);
+      if (document.visibilityState === 'visible') void synchronize(roomCode, true);
     }, 15000);
-    const focus = () => void synchronize(roomCode);
+    const focus = () => void synchronize(roomCode, true);
     window.addEventListener('focus', focus);
+    window.addEventListener('online', focus);
+    document.addEventListener('visibilitychange', focus);
+    void synchronize(roomCode, true);
     return () => {
       clearInterval(timer);
       window.removeEventListener('focus', focus);
+      window.removeEventListener('online', focus);
+      document.removeEventListener('visibilitychange', focus);
       void client.removeChannel(channel);
     };
   }, [room?.code, Boolean(local), synchronize]);
@@ -203,12 +375,22 @@ export function GameApp() {
       clearTimeout(timer);
     };
   }, [room?.version, room?.code, Boolean(local), api, receive, synchronize]);
-  async function run(command: Exclude<Command, { type: 'list' }>): Promise<boolean> {
+  async function run(command: Exclude<Command, { type: 'list' | 'leave' }>): Promise<boolean> {
     setBusy(true);
     setError('');
+    const epoch =
+      command.type === 'create' || command.type === 'join'
+        ? ++generation.current
+        : generation.current;
     try {
       const next = await api(command, command.type === 'create' || command.type === 'join');
+      if (epoch !== generation.current) return false;
       receive(next);
+      setConnectionState('ok');
+      saveRecent(next.code);
+      try {
+        localStorage.setItem('taktik-name', name.trim());
+      } catch {}
       if (command.type === 'create' || command.type === 'join') {
         const address = new URL(location.href);
         address.searchParams.set('salon', next.code);
@@ -225,6 +407,8 @@ export function GameApp() {
     }
   }
   function solo() {
+    generation.current++;
+    setHistoryPreview(null);
     setLocal(
       createGame(
         Array.from({ length: capacity }, (_, i) => ({
@@ -248,6 +432,7 @@ export function GameApp() {
     }
   }
   function submitPlay(action: Play) {
+    setHistoryPreview(null);
     if (local) localAction(() => play(local, 0, action, Math.random));
     else if (room) void run({ type: 'play', code: room.code, version: room.version, play: action });
   }
@@ -285,6 +470,42 @@ export function GameApp() {
       setBusy(false);
     }
   }
+  async function loadPublicRooms() {
+    setBusy(true);
+    setError('');
+    try {
+      setPublicRooms((await api({ type: 'list' }, true)).rooms);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function joinPublic(roomCode: string) {
+    if (!name.trim()) {
+      setError('Indiquez votre pseudo ci-dessus pour rejoindre cette partie.');
+      nameInput.current?.focus();
+      return;
+    }
+    void run({ type: 'join', code: roomCode, name });
+  }
+  async function resumeRoom(roomCode: string) {
+    setBusy(true);
+    setError('');
+    const epoch = ++generation.current;
+    try {
+      const next = await api({ type: 'sync', code: roomCode });
+      if (epoch !== generation.current) return;
+      receive(next);
+      saveRecent(next.code);
+      setConnectionState('ok');
+      history.replaceState(null, '', `${location.pathname}?salon=${next.code}`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const captchaRequired = Boolean(siteKey) && !signedIn;
   const connectionDisabled =
     busy || !onlineConfigured || !authReady || (captchaRequired && !captcha);
@@ -304,18 +525,25 @@ export function GameApp() {
           <button onClick={() => setRules(!rules)} aria-expanded={rules}>
             Règles
           </button>
-          {local && (
-            <button
-              onClick={() => {
-                setLocal(null);
-                setPlayable([]);
-              }}
-            >
-              Quitter
+          {(local || room) && (
+            <button disabled={busy} onClick={leaveCurrent}>
+              Quitter la table
             </button>
           )}
         </nav>
       </header>
+      {room && (
+        <div className="connection-status" role="status">
+          <span>
+            {connectionState === 'ok'
+              ? 'Connecté au salon'
+              : 'Connexion interrompue - votre place est conservée'}
+          </span>
+          <button disabled={busy} onClick={() => synchronize(room.code, true)}>
+            Reprendre / synchroniser
+          </button>
+        </div>
+      )}
       {error && (
         <div className="alert" role="alert">
           <span>{error}</span>
@@ -331,6 +559,12 @@ export function GameApp() {
             ×
           </button>
         </div>
+      )}
+      {unread.length > 0 && room?.game && panel !== 'chat' && (
+        <button className="chat-notification" onClick={() => setPanel('chat')} aria-live="polite">
+          {unread.length} nouveau{unread.length > 1 ? 'x' : ''} message
+          {unread.length > 1 ? 's' : ''} - {unread.at(-1)?.name} - Ouvrir le chat
+        </button>
       )}
       {rules && (
         <section className="rules-panel">
@@ -359,8 +593,33 @@ export function GameApp() {
       {!room && !local && (
         <section className="lobby-layout">
           <div className="setup-panel">
-            <h1>Nouvelle partie</h1>
+            <h1>Jouer au TAC-TIK</h1>
+            <label className="nickname-label" htmlFor="player-name">
+              1. Votre pseudo
+            </label>
+            <input
+              ref={nameInput}
+              id="player-name"
+              className="nickname-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={24}
+              autoComplete="nickname"
+              placeholder="Votre nom dans la partie"
+              aria-describedby="nickname-help"
+            />
+            <p id="nickname-help" className="muted">
+              Obligatoire pour rejoindre ou créer une partie. Conservé sur ce navigateur.
+            </p>
+            <h2>2. Choisir une partie</h2>
             <div className="tabs">
+              <button
+                aria-pressed={tab === 'public'}
+                className={tab === 'public' ? 'selected' : ''}
+                onClick={() => setTab('public')}
+              >
+                Salons publics
+              </button>
               <button
                 aria-pressed={tab === 'create'}
                 className={tab === 'create' ? 'selected' : ''}
@@ -373,12 +632,21 @@ export function GameApp() {
                 className={tab === 'join' ? 'selected' : ''}
                 onClick={() => setTab('join')}
               >
-                Rejoindre
+                Avec un code
               </button>
             </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                if (tab === 'public') {
+                  void loadPublicRooms();
+                  return;
+                }
+                if (!name.trim()) {
+                  setError('Indiquez votre pseudo pour continuer.');
+                  nameInput.current?.focus();
+                  return;
+                }
                 void run(
                   tab === 'create'
                     ? { type: 'create', name, capacity, jokers, public: publicRoom }
@@ -386,17 +654,6 @@ export function GameApp() {
                 );
               }}
             >
-              <label>
-                Pseudo
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  maxLength={24}
-                  required
-                  autoComplete="nickname"
-                  placeholder="Pseudo"
-                />
-              </label>
               {tab === 'create' ? (
                 <>
                   <label className="checkbox">
@@ -438,7 +695,7 @@ export function GameApp() {
                     . {capacity === 8 ? 'Deux paquets.' : ''}
                   </p>
                 </>
-              ) : (
+              ) : tab === 'join' ? (
                 <label>
                   Code du salon
                   <input
@@ -457,6 +714,8 @@ export function GameApp() {
                     placeholder="8 caractères"
                   />
                 </label>
+              ) : (
+                <p>Rejoignez une table ouverte, sans code d'invitation.</p>
               )}
               {onlineConfigured && captchaRequired && (
                 <div className="captcha-box">
@@ -507,49 +766,70 @@ export function GameApp() {
                 </div>
               )}
               <button className="primary wide" disabled={connectionDisabled}>
-                {busy ? 'Connexion...' : tab === 'create' ? 'Créer le salon' : 'Rejoindre le salon'}
+                {busy
+                  ? 'Chargement...'
+                  : tab === 'public'
+                    ? publicRooms
+                      ? 'Actualiser les salons'
+                      : 'Afficher les salons publics'
+                    : tab === 'create'
+                      ? 'Créer le salon'
+                      : 'Rejoindre le salon'}
               </button>
               {!onlineConfigured && <p className="error-text">{configurationIssue}</p>}
             </form>
-            <section className="public-rooms" aria-label="Salons publics">
-              <h2>Salons publics</h2>
-              <button
-                disabled={connectionDisabled}
-                onClick={async () => {
-                  setBusy(true);
-                  setError('');
-                  try {
-                    setPublicRooms((await api({ type: 'list' }, true)).rooms);
-                  } catch (e) {
-                    setError((e as Error).message);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                {publicRooms ? 'Actualiser la liste' : 'Voir les parties ouvertes'}
-              </button>
-              {publicRooms?.length === 0 && <p>Aucun salon disponible pour le moment.</p>}
-              {publicRooms?.map((item) => (
-                <div className="public-room" key={item.code}>
-                  <span>
-                    <b>{item.name}</b> - {item.players}/{item.capacity} joueurs
-                    <br />
-                    {item.jokers ? 'Avec Joker' : 'Sans Joker'}
-                  </span>
+            {tab === 'public' && (
+              <section className="public-rooms" aria-label="Salons publics">
+                {publicRooms?.length === 0 && <p>Aucun salon disponible pour le moment.</p>}
+                {publicRooms?.map((item) => (
+                  <div className="public-room" key={item.code}>
+                    <span>
+                      <b>{item.name}</b> - {item.players}/{item.capacity} joueurs
+                      <br />
+                      {item.jokers ? 'Avec Joker' : 'Sans Joker'}
+                    </span>
+                    <button disabled={connectionDisabled} onClick={() => joinPublic(item.code)}>
+                      Rejoindre
+                    </button>
+                  </div>
+                ))}
+                {publicRooms && !name.trim() && (
+                  <p className="muted">Renseignez votre pseudo pour rejoindre.</p>
+                )}
+              </section>
+            )}
+            {recentRooms.length > 0 && (
+              <section className="recent-rooms" aria-label="Mes parties récentes">
+                <h2>Mes parties récentes</h2>
+                <p className="muted">
+                  Reprenez votre place avec ce navigateur. Aucun nouveau pseudo n'est nécessaire.
+                </p>
+                {recentRooms.map((roomCode) => (
                   <button
-                    disabled={connectionDisabled || !name.trim()}
-                    onClick={() => run({ type: 'join', code: item.code, name })}
+                    key={roomCode}
+                    disabled={busy || !signedIn}
+                    onClick={() => resumeRoom(roomCode)}
                   >
-                    Rejoindre
+                    Reprendre {roomCode}
                   </button>
-                </div>
-              ))}
-              {publicRooms && !name.trim() && (
-                <p className="muted">Renseignez votre pseudo pour rejoindre.</p>
-              )}
-            </section>
+                ))}
+                {!signedIn && (
+                  <p className="error-text">
+                    Votre session n'est pas disponible. Utilisez le navigateur et le profil
+                    d'origine pour retrouver votre place.
+                  </p>
+                )}
+              </section>
+            )}
             <div className="solo-entry">
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={showBotHands}
+                  onChange={(e) => setShowBotHands(e.target.checked)}
+                />
+                Observer les cartes des bots (solo uniquement)
+              </label>
               <button className="secondary wide" onClick={solo}>
                 Jouer contre {capacity - 1} bots
               </button>
@@ -587,6 +867,9 @@ export function GameApp() {
         <section className="waiting-layout">
           <div className="setup-panel">
             <h1>Salon {room.code}</h1>
+            <p className="muted">
+              Présence actualisée toutes les 15 s. Absent après 45 s sans signal.
+            </p>
             <p>
               {room.people.length} / {room.capacity} joueurs ·{' '}
               {room.jokers ? 'Avec Joker' : 'Sans Joker'}
@@ -596,7 +879,10 @@ export function GameApp() {
                 <div className="seat" key={i}>
                   <span>{i + 1}</span>
                   <b>{room.people[i]?.name ?? 'Place libre'}</b>
-                  <small>{room.people[i]?.bot ? 'Bot' : room.people[i]?.me ? 'Vous' : ''}</small>
+                  <small>
+                    {room.people[i]?.me ? 'Vous - ' : ''}
+                    {room.people[i] ? PRESENCE_LABELS[room.people[i].presence] : ''}
+                  </small>
                   {room.host && i > 0 && room.people[i] && (
                     <button
                       disabled={busy}
@@ -651,59 +937,45 @@ export function GameApp() {
       {view && (
         <div className="game-layout">
           <section className="table-area">
-            <div className="team-identity">
-              <b>Vous : {view.players[view.me].colors.map((c) => COLOR_NAMES[c]).join(' + ')}</b>
-              <span>
-                {view.players.length >= 4
-                  ? `Equipe ${view.players[view.me].team + 1} avec ${view.players
-                      .filter((p, i) => i !== view.me && p.team === view.players[view.me].team)
-                      .map((p) => `${p.name} (${p.colors.map((c) => COLOR_NAMES[c]).join(', ')})`)
-                      .join(', ')}`
-                  : 'Vous contrôlez ces deux couleurs'}
-              </span>
-            </div>
-            <div className="players">
-              {view.players.map((p, i) => (
-                <div
-                  key={p.id}
-                  className={`player ${view.phase === 'play' && view.turn === i ? 'current' : ''}`}
-                >
-                  <span className="color-dots">
-                    {p.colors.map((c) => (
-                      <i key={c} title={COLOR_NAMES[c]} style={{ background: PALETTE[c] }} />
-                    ))}
-                  </span>
-                  <b>
-                    {p.name}
-                    {i === view.me ? ' (vous)' : ''}
-                  </b>
-                  <small>
-                    {p.bot ? 'Bot · ' : ''}
-                    {view.players.length >= 4 ? `Éq. ${p.team + 1} · ` : ''}
-                    {view.handCounts[i]} cartes
-                    {view.phase === 'exchange' && view.exchanged[i] ? ' ✓' : ''}
-                  </small>
-                </div>
-              ))}
-            </div>
+            <PlayerList view={view} room={room} local={Boolean(local)} />
+            <TurnOrder view={view} />
             <div className={`board-stage ${zoom ? 'zoomed' : ''}`}>
               <Board
                 game={view}
+                orient
                 selected={selectedPiece}
-                playable={busy ? [] : playable}
-                destinations={destinations}
+                playable={busy || historyPreview ? [] : playable}
+                destinations={historyPreview ? [] : destinations}
+                historyChanges={historyPreview?.changes ?? []}
                 onMove={(move) => !busy && interaction.current.move(move)}
                 onPiece={(id) => !busy && interaction.current.piece(id)}
               />
             </div>
             <div className="board-tools">
               <span>↻ Sens horaire · {view.deckCount} cartes en pioche</span>
+              {historyPreview && (
+                <button onClick={() => setHistoryPreview(null)}>
+                  Fermer l'aperçu du coup {historyPreview.id}
+                </button>
+              )}
               <button aria-pressed={zoom} onClick={() => setZoom(!zoom)}>
                 {zoom ? 'Ajuster le plateau' : 'Agrandir'}
               </button>
             </div>
           </section>
           <aside className="game-sidebar">
+            {local && (
+              <div className="training-options">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showBotHands}
+                    onChange={(e) => setShowBotHands(e.target.checked)}
+                  />
+                  Voir les cartes des bots
+                </label>
+              </div>
+            )}
             <TurnControls
               view={view}
               busy={busy}
@@ -716,24 +988,33 @@ export function GameApp() {
               onPlay={submitPlay}
               onDiscardHand={submitDiscard}
             />
+            {local && showBotHands && <BotHands game={local} />}
             <section className="session-panel">
               <div className="tabs">
                 <button
                   className={panel === 'log' ? 'selected' : ''}
                   aria-pressed={panel === 'log'}
-                  onClick={() => setPanel(panel === 'log' ? null : 'log')}
+                  onClick={() => {
+                    setPanel(panel === 'log' ? null : 'log');
+                    setHistoryPreview(null);
+                  }}
                   aria-expanded={panel === 'log'}
                 >
                   Historique
                 </button>
                 {room && !local && (
                   <button
-                    className={panel === 'chat' ? 'selected' : ''}
+                    className={panel === 'chat' ? 'selected' : unread.length ? 'has-unread' : ''}
                     aria-pressed={panel === 'chat'}
-                    onClick={() => setPanel(panel === 'chat' ? null : 'chat')}
+                    onClick={() => {
+                      setPanel(panel === 'chat' ? null : 'chat');
+                      setHistoryPreview(null);
+                    }}
                     aria-expanded={panel === 'chat'}
                   >
-                    {panel === 'chat' ? 'Fermer le chat' : `Chat (${room.messages.length})`}
+                    {panel === 'chat'
+                      ? 'Fermer le chat'
+                      : `Chat${unread.length ? ` - ${unread.length} non lus` : ''}`}
                   </button>
                 )}
               </div>
@@ -743,11 +1024,7 @@ export function GameApp() {
                   onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
                 />
               ) : panel === 'log' ? (
-                <div className="journal">
-                  {view.log.slice(0, 8).map((line, i) => (
-                    <p key={`${i}-${line}`}>{line}</p>
-                  ))}
-                </div>
+                <HistoryPanel view={view} selected={historyPreview} onSelect={setHistoryPreview} />
               ) : null}
             </section>
           </aside>
