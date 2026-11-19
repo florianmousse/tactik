@@ -89,13 +89,10 @@ export function boardLayout(game: Pick<Game, 'players'>): BoardLayout {
     const reserve = Array.from({ length: 4 }, (_, i): Point =>
       sector === 0
         ? [63, 210 + i * 20]
-        : sector === count / 2 - 1
-          ? // Keep the reserve inside the outer track pocket, not beside the center.
-            // Extensions use the side pocket to clear the preceding sector's holes.
-            count === 4
-            ? [start[0] - 30 + i * 20, 70]
-            : [width - 70, 180 + i * 20]
-          : [start[0] - 30 + i * 20, 210],
+        : sector === 1
+          ? [start[0] - 30 + i * 20, 70]
+          : // Later pockets are narrower: tighten spacing, not pawn size.
+            [start[0] - 8.5 + i * 19, 80],
     );
     homes[order[sector]] = home;
     reserves[order[sector]] = reserve;
@@ -118,7 +115,7 @@ export function boardOrientation(game: Pick<Game, 'players'>, color: number) {
   const sector = colorOrder(game).indexOf(color);
   const half = colorCount(game) / 2;
   const side = sector % half;
-  const angle = (side === 0 ? -90 : side === half - 1 ? 90 : 180) + (sector >= half ? 180 : 0);
+  const angle = (side === 0 ? -90 : 180) + (sector >= half ? 180 : 0);
   const sideways = Math.abs(angle % 180) === 90;
   return {
     angle,

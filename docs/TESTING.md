@@ -97,3 +97,19 @@ Resultats de cette iteration : `npm run check` reussi (48 tests, TypeScript stri
 Les reserves bleue et verte sont replacees dans les espaces libres exterieurs selon Screenshot_8 pour quatre couleurs. Les extensions a six et huit couleurs utilisent la poche laterale du panneau pour eviter les cases du secteur adjacent. Le test de non-recouvrement des panneaux et du parcours passe pour les trois configurations, ainsi que les tests d'orientation.
 
 Validation : `npm run check` reussi (48 tests et TypeScript), puis `npm run build` reussi. Rendus SVG du composant Board inspectes en images pour 4, 6 et 8 joueurs. Ce controle statique ne remplace pas une recette interactive mobile/bureau ; les limites navigateur precedentes restent applicables. Aucun deploiement effectue.
+
+## Reserves des extensions - 19 novembre 2026
+
+Correction du placement precedent a 6 et 8 couleurs : toutes les reserves des extensions occupent maintenant les espaces exterieurs proches de leur maison. Les espaces les plus etroits utilisent un panneau moins large et un espacement de 19 unites entre pions, sans reduire les pions. Le plateau a quatre couleurs conserve ses coordonnees et dimensions.
+
+`npm run check` reussi (48 tests et TypeScript), puis `npm run build` reussi. Le controle geometrique couvre aussi les cases des maisons. Rendus statiques du composant Board a 6 et 8 inspectes ; recette interactive navigateur non executee (limites precedentes). Aucun deploiement effectue.
+
+## Orientation face au joueur et mouvements - 19 novembre 2026
+
+La rotation aligne maintenant la reserve propre horizontalement dans le quart inferieur pour chaque couleur, au lieu de verifier seulement un depart dans la moitie basse. Le test d'orientation couvre 2/3/4/6/8 joueurs. Le titre et les cartes centrales ont une contre-rotation ; cartes agrandies de 40 x 64 a 60 x 90. Les groupes de pions et leurs reperes utilisent une translation CSS animee de 450 ms ; la preference de reduction des animations la desactive.
+
+`npm run check` reussi (48 tests et TypeScript), puis `npm run build` reussi. Rendus statiques inspectes depuis le bleu a 4 et 8 couleurs. Le mouvement en navigateur, les clics pendant la transition, les permutations, captures et la reduction des animations restent a verifier interactivement (acces navigateur bloque precedemment). Aucun deploiement effectue.
+
+## Parties recentes detaillees - 19 novembre 2026
+
+Les fiches sont relues par sync, avec les droits de membre existants ; aucune nouvelle API ni migration. Seuls les codes restent dans localStorage. Le resume en memoire exclut mains, messages et etat complet. Attente, echange et victoire (y compris equipe zero), partenaire et absence de main sont couverts par un test. `npm run check` reussi : 49 tests et TypeScript, puis `npm run build` reussi. Format des fichiers modifies verifie avec Prettier. Recette interactive restante : victoire distante pendant une absence, retour accueil, actualisation, acces perdu, panne reseau et lisibilite mobile. Integration Supabase non executee ; aucune validation multijoueur reelle revendiquee. Aucun deploiement effectue.

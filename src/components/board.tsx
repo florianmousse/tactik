@@ -137,7 +137,9 @@ export function Board({
             reserve = layout.reserves[c];
           const minX = Math.min(...reserve.map((p) => p[0])),
             minY = Math.min(...reserve.map((p) => p[1]));
-          const horizontal = reserve[0][1] === reserve[1][1];
+          const maxX = Math.max(...reserve.map((p) => p[0])),
+            maxY = Math.max(...reserve.map((p) => p[1]));
+          const paddingX = maxX - minX === 57 ? 12.5 : 18;
           return (
             <g key={c}>
               <path
@@ -159,10 +161,10 @@ export function Board({
                 />
               ))}
               <rect
-                x={minX - 18}
+                x={minX - paddingX}
                 y={minY - 19}
-                width={horizontal ? 96 : 36}
-                height={horizontal ? 38 : 98}
+                width={maxX - minX + paddingX * 2}
+                height={maxY - minY + 38}
                 rx="12"
                 fill="#342e24"
                 stroke={PALETTE[c]}
@@ -171,35 +173,37 @@ export function Board({
             </g>
           );
         })}
-        <text
-          x={layout.width / 2}
-          y="254"
-          textAnchor="middle"
-          fontFamily="Georgia,serif"
-          fontSize="26"
-          fill="#493a25"
-          letterSpacing="3"
-        >
-          TAC✳TIK
-        </text>
-        <g transform={`translate(${layout.width / 2 - 43},275)`}>
-          <rect width="40" height="64" rx="5" fill="#263e34" stroke="#f0e4c8" strokeWidth="3" />
-          <text x="20" y="38" textAnchor="middle" fill="#e6d5ad" fontSize="18">
-            ✳
-          </text>
-        </g>
-        <g transform={`translate(${layout.width / 2 + 8},275)`}>
-          <rect width="40" height="64" rx="5" fill="#fbf4e6" stroke="#a48d65" />
+        <g transform={`rotate(${-orientation.angle} ${layout.width / 2} ${layout.height / 2})`}>
           <text
-            x="20"
-            y="38"
+            x={layout.width / 2}
+            y="240"
             textAnchor="middle"
-            fill="#493b29"
             fontFamily="Georgia,serif"
-            fontSize="21"
+            fontSize="26"
+            fill="#493a25"
+            letterSpacing="3"
           >
-            {game.discard.length ? cardSymbol(game.discard.at(-1)!) : ''}
+            TAC✳TIK
           </text>
+          <g transform={`translate(${layout.width / 2 - 68},260)`}>
+            <rect width="60" height="90" rx="6" fill="#263e34" stroke="#f0e4c8" strokeWidth="3" />
+            <text x="30" y="54" textAnchor="middle" fill="#e6d5ad" fontSize="28">
+              ✳
+            </text>
+          </g>
+          <g transform={`translate(${layout.width / 2 + 8},260)`}>
+            <rect width="60" height="90" rx="6" fill="#fbf4e6" stroke="#a48d65" />
+            <text
+              x="30"
+              y="54"
+              textAnchor="middle"
+              fill="#493b29"
+              fontFamily="Georgia,serif"
+              fontSize="30"
+            >
+              {game.discard.length ? cardSymbol(game.discard.at(-1)!) : ''}
+            </text>
+          </g>
         </g>
         {currentDestinations.map((move) => {
           const { color, position } = moveDestination(game, move);
@@ -271,11 +275,12 @@ export function Board({
                 }
               }}
               className={enabled ? 'peg selectable' : 'peg'}
+              style={{ transform: `translate(${x}px, ${y}px)` }}
             >
               {(enabled || selected === p.id) && (
                 <circle
-                  cx={x}
-                  cy={y}
+                  cx={0}
+                  cy={0}
                   r="19"
                   fill="#fff9"
                   stroke="#184a77"
@@ -283,7 +288,7 @@ export function Board({
                   strokeDasharray={selected === p.id ? undefined : '3 3'}
                 />
               )}
-              <g transform={`translate(${x},${y})`} filter={`url(#${uid}-peg-shadow)`}>
+              <g filter={`url(#${uid}-peg-shadow)`}>
                 <circle r="8.5" fill={PALETTE[p.color]} stroke="#26251e" strokeWidth="1.2" />
                 <circle cx="-2" cy="-2" r="4" fill="#fff" opacity=".23" />
                 {p.stake && <circle r="3" fill="#191919" stroke="#fff" strokeWidth="1" />}

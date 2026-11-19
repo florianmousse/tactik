@@ -266,6 +266,9 @@ legend {
   object-fit: contain;
   filter: drop-shadow(0 5px 5px #37250f1c);
 }
+.peg {
+  transition: transform 450ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
 .peg.selectable {
   cursor: pointer;
 }
@@ -1047,6 +1050,22 @@ legend {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
+}
+.recent-room {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.recent-room p {
+  margin: 0;
+}
+.recent-room-result {
+  color: #18533a;
+  font-weight: 700;
 }
 .recent-rooms button {
   margin: 4px;

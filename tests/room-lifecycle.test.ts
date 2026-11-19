@@ -98,6 +98,9 @@ test('orientation : départ en bas pour chaque joueur, cibles et plateau restent
           (y - layout.height / 2) * Math.cos(radians),
       ];
       assert.ok(rotate(layout.track[startPosition(game, color)])[1] > oriented.height / 2);
+      const reserve = layout.reserves[color].map(rotate);
+      assert.ok(reserve.every(([, y]) => y > oriented.height * 0.75));
+      assert.ok(Math.abs(reserve[0][1] - reserve[3][1]) < 0.001);
       for (const point of [
         ...layout.track,
         ...Object.values(layout.reserves).flat(),
@@ -110,8 +113,7 @@ test('orientation : départ en bas pour chaque joueur, cibles et plateau restent
     for (const color of [0, 1])
       assert.equal(new Set(layout.reserves[color].map(([x]) => x)).size, 1);
     for (const color of [2, 3]) {
-      const axis = layout.width === 584 ? 1 : 0;
-      assert.equal(new Set(layout.reserves[color].map((p) => p[axis])).size, 1);
+      assert.equal(new Set(layout.reserves[color].map((p) => p[1])).size, 1);
     }
     assert.deepEqual(game, before);
   }

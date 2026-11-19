@@ -223,12 +223,15 @@ test('réserves : leurs panneaux ne recouvrent aucune case du parcours', () => {
   for (const count of [4, 6, 8]) {
     const layout = boardLayout(setup(count));
     for (const reserve of Object.values(layout.reserves)) {
-      const horizontal = reserve[0][1] === reserve[1][1];
-      const left = Math.min(...reserve.map(([x]) => x)) - 20.5;
+      const spanX = Math.max(...reserve.map(([x]) => x)) - Math.min(...reserve.map(([x]) => x));
+      const paddingX = spanX === 57 ? 15 : 20.5;
+      const left = Math.min(...reserve.map(([x]) => x)) - paddingX;
       const top = Math.min(...reserve.map(([, y]) => y)) - 21.5;
-      for (const [x, y] of layout.track) {
-        const dx = Math.max(left - x, 0, x - (left + (horizontal ? 101 : 41)));
-        const dy = Math.max(top - y, 0, y - (top + (horizontal ? 43 : 103)));
+      const right = Math.max(...reserve.map(([x]) => x)) + paddingX;
+      const bottom = Math.max(...reserve.map(([, y]) => y)) + 21.5;
+      for (const [x, y] of [...layout.track, ...Object.values(layout.homes).flat()]) {
+        const dx = Math.max(left - x, 0, x - right);
+        const dy = Math.max(top - y, 0, y - bottom);
         assert.ok(Math.hypot(dx, dy) > 16, `Parcours masqué à ${count} : ${x},${y}`);
       }
     }

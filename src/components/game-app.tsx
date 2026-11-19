@@ -13,6 +13,7 @@ import { ApiError, requestGame } from '@/lib/game-api';
 import { Board } from './board';
 import { TurnControls } from './turn-controls';
 import { Chat } from './chat';
+import { RecentRooms } from './recent-rooms';
 import { HistoryPanel } from './history-panel';
 import { BotHands } from './bot-hands';
 import { TurnOrder } from './turn-order';
@@ -219,6 +220,10 @@ export function GameApp() {
       throw new ApiError(401, 'Session renouvelée. Synchronisez avant de refaire votre action.');
     }
   }, []);
+  const loadRecentRoom = useCallback(
+    (roomCode: string) => api({ type: 'sync', code: roomCode }),
+    [api],
+  );
   const synchronize = useCallback(
     async (roomCode: string, heartbeat = false) => {
       if (syncing.current) return;
@@ -799,27 +804,13 @@ export function GameApp() {
               </section>
             )}
             {recentRooms.length > 0 && (
-              <section className="recent-rooms" aria-label="Mes parties récentes">
-                <h2>Mes parties récentes</h2>
-                <p className="muted">
-                  Reprenez votre place avec ce navigateur. Aucun nouveau pseudo n'est nécessaire.
-                </p>
-                {recentRooms.map((roomCode) => (
-                  <button
-                    key={roomCode}
-                    disabled={busy || !signedIn}
-                    onClick={() => resumeRoom(roomCode)}
-                  >
-                    Reprendre {roomCode}
-                  </button>
-                ))}
-                {!signedIn && (
-                  <p className="error-text">
-                    Votre session n'est pas disponible. Utilisez le navigateur et le profil
-                    d'origine pour retrouver votre place.
-                  </p>
-                )}
-              </section>
+              <RecentRooms
+                codes={recentRooms}
+                signedIn={signedIn}
+                busy={busy}
+                load={loadRecentRoom}
+                resume={resumeRoom}
+              />
             )}
             <div className="solo-entry">
               <label className="checkbox">
