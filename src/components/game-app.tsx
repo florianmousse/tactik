@@ -37,7 +37,7 @@ export function GameApp() {
     piece: () => {},
     move: () => {},
   });
-  const [tab, setTab] = useState<'create' | 'join' | 'public'>('public'),
+  const [tab, setTab] = useState<'create' | 'join' | 'public' | 'recent' | 'solo'>('public'),
     [panel, setPanel] = useState<'log' | 'chat' | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -596,28 +596,10 @@ export function GameApp() {
         </section>
       )}
       {!room && !local && (
-        <section className="lobby-layout">
+        <section className="lobby-layout home-layout">
           <div className="setup-panel">
             <h1>Jouer au TAC-TIK</h1>
-            <label className="nickname-label" htmlFor="player-name">
-              1. Votre pseudo
-            </label>
-            <input
-              ref={nameInput}
-              id="player-name"
-              className="nickname-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={24}
-              autoComplete="nickname"
-              placeholder="Votre nom dans la partie"
-              aria-describedby="nickname-help"
-            />
-            <p id="nickname-help" className="muted">
-              Obligatoire pour rejoindre ou créer une partie. Conservé sur ce navigateur.
-            </p>
-            <h2>2. Choisir une partie</h2>
-            <div className="tabs">
+            <div className="tabs home-tabs" aria-label="Choisir comment jouer">
               <button
                 aria-pressed={tab === 'public'}
                 className={tab === 'public' ? 'selected' : ''}
@@ -639,150 +621,189 @@ export function GameApp() {
               >
                 Avec un code
               </button>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (tab === 'public') {
-                  void loadPublicRooms();
-                  return;
-                }
-                if (!name.trim()) {
-                  setError('Indiquez votre pseudo pour continuer.');
-                  nameInput.current?.focus();
-                  return;
-                }
-                void run(
-                  tab === 'create'
-                    ? { type: 'create', name, capacity, jokers, public: publicRoom }
-                    : { type: 'join', name, code },
-                );
-              }}
-            >
-              {tab === 'create' ? (
-                <>
-                  <label className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={publicRoom}
-                      onChange={(e) => setPublicRoom(e.target.checked)}
-                    />
-                    Salon public - visible dans la liste
-                  </label>
-                  <fieldset>
-                    <legend>Joueurs</legend>
-                    <div className="capacity">
-                      {([2, 3, 4, 6, 8] as const).map((n) => (
-                        <button
-                          key={n}
-                          type="button"
-                          aria-pressed={capacity === n}
-                          className={capacity === n ? 'selected' : ''}
-                          onClick={() => setCapacity(n)}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <label className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={jokers}
-                      onChange={(e) => setJokers(e.target.checked)}
-                    />
-                    1 Joker par paquet
-                  </label>
-                  <p className="muted">
-                    {capacity < 4
-                      ? 'Individuel, deux couleurs par joueur'
-                      : `${capacity / 2} équipes de deux`}
-                    . {capacity === 8 ? 'Deux paquets.' : ''}
-                  </p>
-                </>
-              ) : tab === 'join' ? (
-                <label>
-                  Code du salon
-                  <input
-                    value={code}
-                    onChange={(e) =>
-                      setCode(
-                        e.target.value
-                          .toUpperCase()
-                          .replace(/[^A-Z0-9]/g, '')
-                          .slice(0, 12),
-                      )
-                    }
-                    minLength={8}
-                    maxLength={12}
-                    required
-                    placeholder="8 caractères"
-                  />
-                </label>
-              ) : (
-                <p>Rejoignez une table ouverte, sans code d'invitation.</p>
-              )}
-              {onlineConfigured && captchaRequired && (
-                <div className="captcha-box">
-                  <Turnstile
-                    ref={captchaRef}
-                    siteKey={siteKey!}
-                    onLoadScript={() => setCaptchaLoaded(true)}
-                    onSuccess={(token) => {
-                      setCaptcha(token);
-                      setCaptchaError('');
-                    }}
-                    onExpire={() => {
-                      setCaptcha(undefined);
-                      setCaptchaError('Vérification expirée. Relancer le CAPTCHA.');
-                    }}
-                    onError={(value) => {
-                      setCaptcha(undefined);
-                      setCaptchaError(captchaErrorMessage(value));
-                    }}
-                    onTimeout={() => {
-                      setCaptcha(undefined);
-                      setCaptchaError('Vérification trop longue. Réessayer.');
-                    }}
-                    options={{ theme: 'light', size: 'flexible' }}
-                  />
-                  {!captcha && !captchaError && (
-                    <p className="muted">
-                      {captchaLoaded
-                        ? 'Vérification CAPTCHA en cours...'
-                        : 'Chargement du CAPTCHA...'}
-                    </p>
-                  )}
-                  {captchaError && (
-                    <p role="alert" className="error-text">
-                      {captchaError}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCaptcha(undefined);
-                      setCaptchaError('');
-                      captchaRef.current?.reset();
-                    }}
-                  >
-                    Relancer le CAPTCHA
-                  </button>
-                </div>
-              )}
-              <button className="primary wide" disabled={connectionDisabled}>
-                {busy
-                  ? 'Chargement...'
-                  : tab === 'public'
-                    ? publicRooms
-                      ? 'Actualiser les salons'
-                      : 'Afficher les salons publics'
-                    : tab === 'create'
-                      ? 'Créer le salon'
-                      : 'Rejoindre le salon'}
+              <button
+                aria-pressed={tab === 'solo'}
+                className={tab === 'solo' ? 'selected' : ''}
+                onClick={() => setTab('solo')}
+              >
+                Contre les bots
               </button>
-              {!onlineConfigured && <p className="error-text">{configurationIssue}</p>}
-            </form>
+              {recentRooms.length > 0 && (
+                <button
+                  aria-pressed={tab === 'recent'}
+                  className={tab === 'recent' ? 'selected' : ''}
+                  onClick={() => setTab('recent')}
+                >
+                  Mes parties ({recentRooms.length})
+                </button>
+              )}
+            </div>
+            {tab !== 'recent' && tab !== 'solo' && (
+              <div className="home-identity">
+                <label className="nickname-label" htmlFor="player-name">
+                  Votre pseudo
+                </label>
+                <input
+                  ref={nameInput}
+                  id="player-name"
+                  className="nickname-input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={24}
+                  autoComplete="nickname"
+                  placeholder="Votre nom dans la partie"
+                  aria-describedby="nickname-help"
+                />
+                <p id="nickname-help" className="muted">
+                  Pour rejoindre ou créer un salon.
+                </p>
+              </div>
+            )}
+            {tab !== 'recent' && tab !== 'solo' && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (tab === 'public') {
+                    void loadPublicRooms();
+                    return;
+                  }
+                  if (!name.trim()) {
+                    setError('Indiquez votre pseudo pour continuer.');
+                    nameInput.current?.focus();
+                    return;
+                  }
+                  void run(
+                    tab === 'create'
+                      ? { type: 'create', name, capacity, jokers, public: publicRoom }
+                      : { type: 'join', name, code },
+                  );
+                }}
+              >
+                {tab === 'create' ? (
+                  <>
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={publicRoom}
+                        onChange={(e) => setPublicRoom(e.target.checked)}
+                      />
+                      Salon public - visible dans la liste
+                    </label>
+                    <fieldset>
+                      <legend>Joueurs</legend>
+                      <div className="capacity">
+                        {([2, 3, 4, 6, 8] as const).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            aria-pressed={capacity === n}
+                            className={capacity === n ? 'selected' : ''}
+                            onClick={() => setCapacity(n)}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={jokers}
+                        onChange={(e) => setJokers(e.target.checked)}
+                      />
+                      1 Joker par paquet
+                    </label>
+                    <p className="muted">
+                      {capacity < 4
+                        ? 'Individuel, deux couleurs par joueur'
+                        : `${capacity / 2} équipes de deux`}
+                      . {capacity === 8 ? 'Deux paquets.' : ''}
+                    </p>
+                  </>
+                ) : tab === 'join' ? (
+                  <label>
+                    Code du salon
+                    <input
+                      value={code}
+                      onChange={(e) =>
+                        setCode(
+                          e.target.value
+                            .toUpperCase()
+                            .replace(/[^A-Z0-9]/g, '')
+                            .slice(0, 12),
+                        )
+                      }
+                      minLength={8}
+                      maxLength={12}
+                      required
+                      placeholder="8 caractères"
+                    />
+                  </label>
+                ) : (
+                  <p>Rejoignez une table ouverte, sans code d'invitation.</p>
+                )}
+                {onlineConfigured && captchaRequired && (
+                  <div className="captcha-box">
+                    <Turnstile
+                      ref={captchaRef}
+                      siteKey={siteKey!}
+                      onLoadScript={() => setCaptchaLoaded(true)}
+                      onSuccess={(token) => {
+                        setCaptcha(token);
+                        setCaptchaError('');
+                      }}
+                      onExpire={() => {
+                        setCaptcha(undefined);
+                        setCaptchaError('Vérification expirée. Relancer le CAPTCHA.');
+                      }}
+                      onError={(value) => {
+                        setCaptcha(undefined);
+                        setCaptchaError(captchaErrorMessage(value));
+                      }}
+                      onTimeout={() => {
+                        setCaptcha(undefined);
+                        setCaptchaError('Vérification trop longue. Réessayer.');
+                      }}
+                      options={{ theme: 'light', size: 'flexible' }}
+                    />
+                    {!captcha && !captchaError && (
+                      <p className="muted">
+                        {captchaLoaded
+                          ? 'Vérification CAPTCHA en cours...'
+                          : 'Chargement du CAPTCHA...'}
+                      </p>
+                    )}
+                    {captchaError && (
+                      <p role="alert" className="error-text">
+                        {captchaError}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCaptcha(undefined);
+                        setCaptchaError('');
+                        captchaRef.current?.reset();
+                      }}
+                    >
+                      Relancer le CAPTCHA
+                    </button>
+                  </div>
+                )}
+                <button className="primary wide" disabled={connectionDisabled}>
+                  {busy
+                    ? 'Chargement...'
+                    : tab === 'public'
+                      ? publicRooms
+                        ? 'Actualiser les salons'
+                        : 'Afficher les salons publics'
+                      : tab === 'create'
+                        ? 'Créer le salon'
+                        : 'Rejoindre le salon'}
+                </button>
+                {!onlineConfigured && <p className="error-text">{configurationIssue}</p>}
+              </form>
+            )}
             {tab === 'public' && (
               <section className="public-rooms" aria-label="Salons publics">
                 {publicRooms?.length === 0 && <p>Aucun salon disponible pour le moment.</p>}
@@ -803,7 +824,7 @@ export function GameApp() {
                 )}
               </section>
             )}
-            {recentRooms.length > 0 && (
+            {tab === 'recent' && (
               <RecentRooms
                 codes={recentRooms}
                 signedIn={signedIn}
@@ -812,46 +833,76 @@ export function GameApp() {
                 resume={resumeRoom}
               />
             )}
-            <div className="solo-entry">
-              <label className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={showBotHands}
-                  onChange={(e) => setShowBotHands(e.target.checked)}
-                />
-                Observer les cartes des bots (solo uniquement)
-              </label>
-              <button className="secondary wide" onClick={solo}>
-                Jouer contre {capacity - 1} bots
-              </button>
-              <span className="muted">Local, sans connexion. {capacity} joueurs.</span>
-            </div>
+            {tab === 'solo' && (
+              <div className="solo-entry">
+                <h2>Jouer contre les bots</h2>
+                <fieldset>
+                  <legend>Nombre de joueurs, vous compris</legend>
+                  <div className="capacity">
+                    {([2, 3, 4, 6, 8] as const).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        aria-pressed={capacity === n}
+                        className={capacity === n ? 'selected' : ''}
+                        onClick={() => setCapacity(n)}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={jokers}
+                    onChange={(e) => setJokers(e.target.checked)}
+                  />
+                  1 Joker par paquet
+                </label>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={showBotHands}
+                    onChange={(e) => setShowBotHands(e.target.checked)}
+                  />
+                  Observer les cartes des bots (solo uniquement)
+                </label>
+                <button className="secondary wide" onClick={solo}>
+                  Jouer contre {capacity - 1} bots
+                </button>
+                <span className="muted">Local, sans connexion. {capacity} joueurs.</span>
+              </div>
+            )}
           </div>
-          <div className="setup-preview">
-            <Board
-              game={viewFor(
-                createGame(
-                  Array.from({ length: capacity }, (_, i) => ({
-                    id: `preview-${i}`,
-                    name: `Joueur ${i + 1}`,
-                  })),
-                  () => 0.5,
-                  { jokers },
-                ),
-                'preview-0',
-              )}
-              playable={[]}
-              onPiece={() => {}}
-            />
-            <p>
-              {capacity === 8
-                ? '4 panneaux'
-                : capacity === 6 || capacity === 3
-                  ? '3 panneaux'
-                  : '2 panneaux'}{' '}
-              · {capacity < 4 ? capacity * 2 : capacity} couleurs
-            </p>
-          </div>
+          {(tab === 'create' || tab === 'solo') && (
+            <details className="setup-preview home-preview">
+              <summary>Voir le plateau ({capacity} joueurs)</summary>
+              <Board
+                game={viewFor(
+                  createGame(
+                    Array.from({ length: capacity }, (_, i) => ({
+                      id: `preview-${i}`,
+                      name: `Joueur ${i + 1}`,
+                    })),
+                    () => 0.5,
+                    { jokers },
+                  ),
+                  'preview-0',
+                )}
+                playable={[]}
+                onPiece={() => {}}
+              />
+              <p>
+                {capacity === 8
+                  ? '4 panneaux'
+                  : capacity === 6 || capacity === 3
+                    ? '3 panneaux'
+                    : '2 panneaux'}{' '}
+                · {capacity < 4 ? capacity * 2 : capacity} couleurs
+              </p>
+            </details>
+          )}
         </section>
       )}
       {room && !view && (

@@ -52,10 +52,6 @@ export function RecentRooms({
   return (
     <section className="recent-rooms" aria-label="Mes parties récentes">
       <h2>Mes parties récentes</h2>
-      <p className="muted">
-        Retrouvez vos joueurs et votre place avec ce navigateur. Aucun nouveau pseudo n'est
-        nécessaire.
-      </p>
       <button disabled={!signedIn || busy} onClick={() => setRevision((value) => value + 1)}>
         Actualiser les parties
       </button>
@@ -64,7 +60,11 @@ export function RecentRooms({
         const summary = typeof entry === 'object' ? entry : null;
         return (
           <article className="recent-room" key={code}>
-            <strong>{summary ? summary.players.join(', ') : `Partie ${code}`}</strong>
+            <strong>
+              {summary
+                ? `${summary.players.slice(0, 2).join(', ')}${summary.players.length > 2 ? ` + ${summary.players.length - 2}` : ''}`
+                : `Partie ${code}`}
+            </strong>
             <p className={summary?.finished ? 'recent-room-result' : ''}>
               {summary?.status ??
                 (typeof entry === 'string'
@@ -73,20 +73,24 @@ export function RecentRooms({
                     ? 'Chargement des informations...'
                     : "Connectez-vous avec votre session d'origine.")}
             </p>
-            {summary && (
-              <>
-                <p>
-                  {summary.count}/{summary.capacity} joueurs ·{' '}
-                  {summary.jokers ? 'Avec Joker' : 'Sans Joker'}
-                  {summary.round ? ` · Donne ${summary.round}` : ''}
-                </p>
-                <p>
-                  Vous : {summary.me}
-                  {summary.partner ? ` · Coéquipier : ${summary.partner}` : ''}
-                </p>
-              </>
-            )}
-            <small>Code : {code}</small>
+            <details>
+              <summary>Détails de la partie</summary>
+              {summary && (
+                <>
+                  <p>{summary.players.join(', ')}</p>
+                  <p>
+                    {summary.count}/{summary.capacity} joueurs ·{' '}
+                    {summary.jokers ? 'Avec Joker' : 'Sans Joker'}
+                    {summary.round ? ` · Donne ${summary.round}` : ''}
+                  </p>
+                  <p>
+                    Vous : {summary.me}
+                    {summary.partner ? ` · Coéquipier : ${summary.partner}` : ''}
+                  </p>
+                </>
+              )}
+              <small>Code : {code}</small>
+            </details>
             <button disabled={busy || !signedIn} onClick={() => resume(code)}>
               {summary?.finished ? 'Voir le résultat' : 'Reprendre'}
             </button>

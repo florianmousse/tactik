@@ -112,4 +112,6 @@ La rotation aligne maintenant la reserve propre horizontalement dans le quart in
 
 ## Parties recentes detaillees - 19 novembre 2026
 
+Accueil reorganise : une rubrique visible a la fois (public, creation, code, bots, parties recentes), details des parties et apercu du plateau repliables. Les options du solo sont accessibles dans sa propre rubrique. Validation apres reorganisation : `npm run check` reussi (49 tests et TypeScript), puis `npm run build` reussi. Recette visuelle bureau/mobile et navigation interactive restant a effectuer ; les limites d'acces navigateur precedentes restent applicables. Pas de deploiement.
+
 Les fiches sont relues par sync, avec les droits de membre existants ; aucune nouvelle API ni migration. Seuls les codes restent dans localStorage. Le resume en memoire exclut mains, messages et etat complet. Attente, echange et victoire (y compris equipe zero), partenaire et absence de main sont couverts par un test. `npm run check` reussi : 49 tests et TypeScript, puis `npm run build` reussi. Format des fichiers modifies verifie avec Prettier. Recette interactive restante : victoire distante pendant une absence, retour accueil, actualisation, acces perdu, panne reseau et lisibilite mobile. Integration Supabase non executee ; aucune validation multijoueur reelle revendiquee. Aucun deploiement effectue.

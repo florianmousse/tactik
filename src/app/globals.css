@@ -1221,3 +1221,98 @@ legend {
     font-size: 15px;
   }
 }
+
+/* Home: one action panel, with secondary information disclosed on demand. */
+.home-layout {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 800px;
+  min-height: 0;
+  margin: 0 auto;
+  align-items: start;
+  gap: 16px;
+}
+.home-tabs {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0;
+}
+.home-tabs button {
+  min-height: 44px;
+  flex: 1 1 110px;
+}
+.home-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 20px;
+}
+.home-identity .nickname-label {
+  margin: 0;
+}
+.home-identity .nickname-input {
+  width: 100%;
+  margin: 0;
+}
+.home-identity p {
+  grid-column: 2;
+  margin: 0;
+  font-size: 12px;
+}
+.home-layout .solo-entry,
+.home-layout .recent-rooms {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.home-layout .public-rooms {
+  margin-top: 16px;
+  padding-top: 0;
+  border-top: 0;
+}
+.home-preview {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.home-preview .board {
+  max-height: 440px;
+  margin-top: 16px;
+}
+.home-layout summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.home-layout summary:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+.recent-room details {
+  color: var(--muted);
+  font-size: 13px;
+}
+.recent-room details p {
+  margin: 8px 0;
+}
+.recent-room > button {
+  justify-self: start;
+}
+@media (max-width: 520px) {
+  .home-layout {
+    padding: 16px 0;
+  }
+  .home-layout .setup-panel {
+    padding: 16px;
+  }
+  .home-tabs button {
+    flex-basis: 40%;
+  }
+  .home-identity {
+    grid-template-columns: 1fr;
+  }
+  .home-identity p {
+    grid-column: 1;
+  }
+}
