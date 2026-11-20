@@ -101,3 +101,13 @@ Le champ optionnel `Game.history` contient au plus 40 `TurnRecord` : identifiant
 `simulateMoves` clone seulement joueurs et positions, execute les memes transitions pures que le moteur et retourne les positions et changements. Les bots l'utilisent depuis leur projection privee, sans reconstituer les mains adverses. Les captures alliees sont comparees avant les autres scores, donc une option sans capture alliee est toujours preferee. Une capture obligatoire reste autorisee par les regles.
 
 Le plateau filtre les apercus contre les mouvements de la projection courante avant de calculer une coordonnee. Cette verification evite le rendu transitoire d'un ancien mouvement sur un nouvel etat, avant les effets React de remise a zero. Les traces historiques utilisent leurs positions enregistrees, jamais un recalcul a partir du plateau courant.
+
+## Interface administrateur
+
+La page `/admin` utilise `/api/admin`, distinct de la projection de partie. `admin-access.ts` définit les commandes strictes, la vérification exacte d'UUID et la projection limitée aux mains des bots ; `admin-store.ts` reste serveur uniquement. `ADMIN_USER_IDS` autorise des identités vérifiées par le serveur. La suppression atomique conditionnée par version utilise les cascades existantes, sans nouvelle migration. Le navigateur conserve les cartes consultées uniquement en mémoire et propose de les masquer.
+
+## Mémoire et stratégie des bots
+
+`Game.memories` est un champ JSON optionnel, privé, contenant une mémoire bornée par joueur (13 compteurs de valeurs, une carte donnée encore connue et l'échange de la donne). `View` exclut explicitement cet ensemble et contient uniquement `knowledge`, la mémoire du demandeur. Aucun changement de commande HTTP ni de SQL ; le serveur calcule et sauvegarde la mémoire avec la même transition CAS. Les anciennes parties sans champ commencent avec une mémoire vide.
+
+`card-knowledge.ts` applique les observations aux états clonés : cartes publiques, défausse complète connue seulement du propriétaire, échanges résolus, nouvelle donne et remélange. Il estime les cartes possibles sans lire la pioche ni le contenu des défausses adverses complètes. `playsForHand` réutilise la génération légale à partir des positions publiques et d'une liste explicite de cartes hypothétiques. `legalPlays` conserve ses contrôles de phase/tour et fournit uniquement la vraie main de l'acteur. La stratégie utilise ces simulations pour le don et pour une continuation autour du dernier pion.

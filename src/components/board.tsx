@@ -1,6 +1,6 @@
 'use client';
-import { useId } from 'react';
-import { colorOrder, trackLength } from '@/game/engine';
+import { useEffect, useId, useRef } from 'react';
+import { colorOrder, startPosition, trackLength } from '@/game/engine';
 import { boardLayout, boardOrientation } from '@/game/board-layout';
 import { moveDestination } from '@/game/move-preview';
 import { moveLabel } from '@/game/labels';
@@ -37,6 +37,72 @@ export function Board({
   onPiece: (id: string) => void;
 }) {
   const uid = useId();
+  const svg = useRef<SVGSVGElement>(null);
+  const lastTurn = useRef(game.history?.[0]?.id);
+  const turn = game.history?.[0];
+  useEffect(() => {
+    const previous = lastTurn.current;
+    lastTurn.current = turn?.id;
+    if (
+      !turn ||
+      turn.id === previous ||
+      (previous !== undefined && turn.id !== previous + 1) ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    )
+      return;
+    const animations: Animation[] = [];
+    const card = turn.as ?? turn.card;
+    const stepDurations = new Map<number, number>();
+    const paths = turn.changes.map((change) => {
+      const positions = [change.from];
+      if (change.captured || change.from < 0 || card === 'swap') positions.push(change.to);
+      else {
+        let position = change.from;
+        for (let i = 0; i < 12 && position !== change.to; i++) {
+          position =
+            position >= length
+              ? position + 1
+              : change.to >= length && position === startPosition(game, change.color)
+                ? length
+                : (position + (card === -4 ? -1 : 1) + length) % length;
+          positions.push(position);
+        }
+        if (positions.at(-1) !== change.to) positions.splice(1, positions.length, change.to);
+      }
+      const duration = Math.max(600, (positions.length - 1) * 180);
+      stepDurations.set(change.step, Math.max(stepDurations.get(change.step) ?? 0, duration));
+      return { change, positions, duration };
+    });
+    const total = [...stepDurations.values()].reduce((sum, duration) => sum + duration, 0);
+    const pieceFrames = new Map<string, Keyframe[]>();
+    for (const { change, positions, duration } of paths) {
+      const delay = [...stepDurations]
+        .filter(([step]) => step < change.step)
+        .reduce((sum, [, ms]) => sum + ms, 0);
+      const frames = pieceFrames.get(change.piece) ?? [];
+      positions.forEach((position, index) => {
+        const [x, y] =
+          position < 0
+            ? layout.reserves[change.color][Number(change.piece.split('-')[1])]
+            : position >= length
+              ? layout.homes[change.color][position - length]
+              : layout.track[position];
+        const transform = `translate(${x}px, ${y}px)`;
+        if (!frames.length) frames.push({ transform, offset: 0 });
+        frames.push({
+          transform,
+          offset: (delay + (duration * index) / (positions.length - 1)) / total,
+        });
+      });
+      pieceFrames.set(change.piece, frames);
+    }
+    for (const [piece, frames] of pieceFrames) {
+      const element = svg.current?.querySelector(`[data-piece="${piece}"]`);
+      frames.push({ ...frames.at(-1), offset: 1 });
+      if (element) animations.push(element.animate(frames, { duration: total, easing: 'linear' }));
+    }
+    return () => animations.forEach((animation) => animation.cancel());
+  }, [turn?.id]);
   const layout = boardLayout(game),
     length = trackLength(game),
     order = colorOrder(game);
@@ -47,6 +113,7 @@ export function Board({
     : { angle: 0, width: layout.width, height: layout.height };
   return (
     <svg
+      ref={svg}
       className="board"
       viewBox={`0 0 ${orientation.width} ${orientation.height}`}
       role="group"
@@ -263,6 +330,7 @@ export function Board({
           return (
             <g
               key={p.id}
+              data-piece={p.id}
               role="button"
               tabIndex={enabled ? 0 : -1}
               aria-disabled={!enabled}
@@ -288,6 +356,20 @@ export function Board({
                   strokeDasharray={selected === p.id ? undefined : '3 3'}
                 />
               )}
+              <g pointerEvents="none" transform={`rotate(${-orientation.angle})`}>
+                <path d="M-7 -14 L0 -9 L7 -14" fill="#fff" stroke="#263c32" />
+                <rect x="-10" y="-32" width="20" height="19" rx="7" fill="#fff" stroke="#263c32" />
+                <text
+                  x="0"
+                  y="-18"
+                  textAnchor="middle"
+                  fontSize="13"
+                  fontWeight="bold"
+                  fill="#263c32"
+                >
+                  {n + 1}
+                </text>
+              </g>
               <g filter={`url(#${uid}-peg-shadow)`}>
                 <circle r="8.5" fill={PALETTE[p.color]} stroke="#26251e" strokeWidth="1.2" />
                 <circle cx="-2" cy="-2" r="4" fill="#fff" opacity=".23" />

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import type { Session } from '@supabase/supabase-js';
-import { createGame, discardHand, exchange, play, viewFor } from '@/game/engine';
+import { createGame, discardHand, exchange, play, simulateMoves, viewFor } from '@/game/engine';
 import { pendingBot, stepBot } from '@/game/bots';
 import type { Capacity, Game, Play, Move, TurnRecord } from '@/game/types';
 import type { RoomView, PublicRoom } from '@/game/room';
@@ -55,6 +55,7 @@ export function GameApp() {
     captchaToken = useRef(captcha);
   captchaToken.current = captcha;
   const [showBotHands, setShowBotHands] = useState(false);
+  const [draftPreview, setDraftPreview] = useState<Play | null>(null);
   const [historyPreview, setHistoryPreview] = useState<TurnRecord | null>(null);
   const [chatSeen, setChatSeen] = useState<{ code: string; ids: string[] } | null>(null);
   const [pageVisible, setPageVisible] = useState(true);
@@ -357,7 +358,7 @@ export function GameApp() {
   }, [room?.code, Boolean(local), synchronize]);
   useEffect(() => {
     if (local && pendingBot(local) >= 0) {
-      const timer = setTimeout(() => setLocal((g) => (g ? stepBot(g, Math.random) : g)), 650);
+      const timer = setTimeout(() => setLocal((g) => (g ? stepBot(g, Math.random) : g)), 3000);
       return () => clearTimeout(timer);
     }
   }, [local]);
@@ -374,7 +375,7 @@ export function GameApp() {
           if (e instanceof ApiError && e.status === 409) await synchronize(room.code);
           else setError((e as Error).message);
         });
-    }, 850);
+    }, 3000);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -875,34 +876,33 @@ export function GameApp() {
               </div>
             )}
           </div>
-          {(tab === 'create' || tab === 'solo') && (
-            <details className="setup-preview home-preview">
-              <summary>Voir le plateau ({capacity} joueurs)</summary>
-              <Board
-                game={viewFor(
-                  createGame(
-                    Array.from({ length: capacity }, (_, i) => ({
-                      id: `preview-${i}`,
-                      name: `Joueur ${i + 1}`,
-                    })),
-                    () => 0.5,
-                    { jokers },
-                  ),
-                  'preview-0',
-                )}
-                playable={[]}
-                onPiece={() => {}}
-              />
-              <p>
-                {capacity === 8
-                  ? '4 panneaux'
-                  : capacity === 6 || capacity === 3
-                    ? '3 panneaux'
-                    : '2 panneaux'}{' '}
-                · {capacity < 4 ? capacity * 2 : capacity} couleurs
-              </p>
-            </details>
-          )}
+          <section className="setup-preview home-preview" aria-label="Aperçu du plateau">
+            <h2>Plateau pour {capacity} joueurs</h2>
+            <a href="/admin">Administration</a>
+            <Board
+              game={viewFor(
+                createGame(
+                  Array.from({ length: capacity }, (_, i) => ({
+                    id: `preview-${i}`,
+                    name: `Joueur ${i + 1}`,
+                  })),
+                  () => 0.5,
+                  { jokers },
+                ),
+                'preview-0',
+              )}
+              playable={[]}
+              onPiece={() => {}}
+            />
+            <p>
+              {capacity === 8
+                ? '4 panneaux'
+                : capacity === 6 || capacity === 3
+                  ? '3 panneaux'
+                  : '2 panneaux'}{' '}
+              · {capacity < 4 ? capacity * 2 : capacity} couleurs
+            </p>
+          </section>
         </section>
       )}
       {room && !view && (
@@ -988,7 +988,23 @@ export function GameApp() {
                 selected={selectedPiece}
                 playable={busy || historyPreview ? [] : playable}
                 destinations={historyPreview ? [] : destinations}
-                historyChanges={historyPreview?.changes ?? []}
+                historyChanges={
+                  historyPreview?.changes ??
+                  (draftPreview &&
+                  view.options.some(
+                    (p) =>
+                      p.cardIndex === draftPreview.cardIndex &&
+                      p.as === draftPreview.as &&
+                      JSON.stringify(p.moves) === JSON.stringify(draftPreview.moves),
+                  )
+                    ? simulateMoves(
+                        view,
+                        view.me,
+                        draftPreview.moves,
+                        (draftPreview.as ?? view.hand[draftPreview.cardIndex]) === 7,
+                      ).changes
+                    : [])
+                }
                 onMove={(move) => !busy && interaction.current.move(move)}
                 onPiece={(id) => !busy && interaction.current.piece(id)}
               />
@@ -1025,6 +1041,7 @@ export function GameApp() {
               onPiece={setSelectedPiece}
               onPlayable={setPlayable}
               onDestinations={setDestinations}
+              onPreview={setDraftPreview}
               interaction={interaction}
               onExchange={submitExchange}
               onPlay={submitPlay}

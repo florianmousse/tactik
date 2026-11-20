@@ -64,3 +64,5 @@ La variante TOCK et les cartes 13 ne sont pas activées.
 La strategie prefere les coups sans capture de ses propres pions ou de ceux du partenaire. Cela ne change pas la legalite des coups : si aucune alternative ne l'evite, une capture alliee reste obligatoire. Le partage d'une carte de demarrage au partenaire utilise uniquement sa situation publique sur le plateau, jamais sa main cachee.
 
 Pendant l'echange, le premier joueur est celui apres le distributeur. Pour la prochaine donne, le distributeur avancera d'une place, et le premier joueur sera celui apres ce nouveau distributeur. L'indicateur A suivre ignore les mains deja vides ; il est recalcule apres chaque coup.
+
+La stratégie des bots peut utiliser une mémoire privée de leurs échanges résolus et des cartes observées. Elle estime les cartes encore possibles et simule les besoins du partenaire, y compris les suites pour le dernier pion. Les règles de coups, d'échange simultané et de confidentialité restent identiques ; un 7 doit toujours être joué en totalité. Voir BOTS.md pour les critères, les approximations et les limites.

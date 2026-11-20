@@ -72,6 +72,16 @@ Le depart avant lancement retire l'appartenance par CAS et ses lignes de presenc
 
 ## Observation locale et traces
 
-L'affichage des cartes des bots est exclusivement local : aucune option de commande HTTP ni aucun champ de projection en ligne ne permet de le demander. Les traces de coups ne stockent que des cartes deja jouees et des positions publiques, sans choix d'echange ou cartes des defausses completes. Elles restent reservees aux membres via viewFor et ne sont jamais publiees sur Realtime.
+L'affichage des cartes des bots pour les joueurs ordinaires est exclusivement local : aucune commande de l'API de jeu ni aucun champ de sa projection ne permet de le demander. L'exception administrateur utilise une API séparée décrite ci-dessous. Les traces de coups ne stockent que des cartes deja jouees et des positions publiques, sans choix d'echange ou cartes des defausses completes. Elles restent reservees aux membres via viewFor et ne sont jamais publiees sur Realtime.
 
 Les erreurs fournies par le navigateur mentionnent GrowthBook, absent du code et des dependances du projet. La CSP n'est pas elargie pour autoriser cette requete. Les messages techniques bruts, etats et identites ne sont pas ajoutes aux logs par l'ecran de recuperation.
+
+## Administration autorisée
+
+`/api/admin` exige la même origine, un JWT vérifié par `auth.getUser`, les limites de taille, JSON strict et quotas distribués de l'API de jeu. Chaque commande vérifie en plus l'appartenance exacte de cet UUID à `ADMIN_USER_IDS`, variable serveur seulement, vide par défaut. Le pseudo et les métadonnées client ne confèrent aucun droit. Un quota supplémentaire borne l'administration à 30 requêtes/minute.
+
+Exception explicite à la projection normale, demandée par le propriétaire : seuls les administrateurs peuvent consulter les mains des bots via un endpoint séparé, jamais les mains humaines, pioche ou échanges non résolus. Aucun champ ajouté à `viewFor`, aucune publication Realtime supplémentaire et aucune nouvelle policy. La suppression de n'importe quel salon est une unique instruction DELETE filtrée par code et version, exclusivement avec service_role. Son résultat est contrôlé et le conflit retourne 409. Les clés étrangères suppriment les données associées atomiquement. Les tests d'intégration réels restent nécessaires avant activation en production.
+
+## Mémoire privée du joueur
+
+La projection exclut `memories` au même titre que `hands`, `deck` et `exchanges`. Seule `knowledge` du demandeur est renvoyée, après vérification de l'appartenance habituelle. Elle ne contient que ses propres échanges résolus, ses cartes données encore certaines et les cartes qu'il a pu observer. Les échanges en attente ne renseignent aucune mémoire. Une défausse complète adverse ne contribue pas ses valeurs au comptage. Les compteurs et échanges des autres joueurs ne sont jamais publiés ni transférés à un bot. La mémoire n'est pas acceptée comme intention client et ne crée aucune autorité supplémentaire côté navigateur.

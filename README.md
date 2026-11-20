@@ -127,7 +127,7 @@ La migration `202611180004_presence_leave.sql` ajoute la presence privee : Prese
 
 Votre fiche apparait en premier, avec votre coequipier sous votre pseudo. Le plateau tourne pour placer votre zone de depart dans sa moitie basse ; les coordonnees logiques et l'ordre des tours ne changent pas. Les reserves bleue et verte occupent les espaces libres au bord du parcours, entre les cases, sur les plateaux a 4, 6 et 8 couleurs.
 
-La reserve de votre premiere couleur est alignee en bas du plateau. Le titre et les cartes centrales restent face a vous, avec des cartes agrandies. Les pions glissent en 450 ms vers leur nouvelle position (trajet direct, y compris captures et permutations). La preference systeme de reduction des animations desactive cette transition. Les regles et la validation des coups ne dependent pas de l'animation.
+La reserve de votre premiere couleur est alignee en bas du plateau. Le titre et les cartes centrales restent face a vous, avec des cartes agrandies. Les pions suivent les cases à 180 ms par pas (minimum 600 ms). Sorties, captures et permutations utilisent un trajet direct. La preference systeme de reduction des animations desactive cette transition. Les regles et la validation des coups ne dependent pas de l'animation.
 
 ## Observation, bots et historique
 
@@ -135,6 +135,22 @@ Le chat signale les nouveaux messages des autres joueurs par un compteur de non-
 
 Les bots simulent les coups legaux avec les seules positions publiques et leur main : ils preferent les alternatives sans capture alliee, y compris sur le passage d'un 7. Si les regles imposent une capture de soi, ils doivent toutefois jouer. Ils evaluent sorties, progression, maisons, permutations et captures adverses. A l'echange, ils peuvent donner un 1 ou un 10 au partenaire encore en reserve, en conservant une sortie si necessaire. Il s'agit d'une heuristique, pas d'une recherche strategique exhaustive.
 
-L'option Observer les cartes des bots est disponible uniquement en entrainement local, avant et pendant la partie. Elle ne change pas ce que les bots voient eux-memes et n'existe pas dans le protocole en ligne.
+L'option Observer les cartes des bots est disponible uniquement en entrainement local, avant et pendant la partie. Elle ne change pas ce que les bots voient eux-memes. Une interface admin séparée permet aussi au propriétaire autorisé de consulter les seules mains des bots en ligne.
 
 L'historique conserve les 40 derniers coups avec leurs positions publiques. Survol, focus clavier ou toucher affiche depart et arrivee, permutations et captures. Agrandir l'historique ouvre un dialogue avec plateau defilable, boutons lisibles et fermeture par Echap. Les parties anciennes restent compatibles : seuls leurs nouveaux coups ont une trace geometrique. Les textes d'evenements precedents restent consultables. Les indicateurs distinguent la personne qui joue ensuite et celle qui commencera la prochaine donne.
+
+## Ergonomie et administration
+
+La dernière carte est sélectionnée automatiquement. Si une carte ne permet de jouer qu'un pion, ce pion est sélectionné ; un déplacement unique est préparé, avec confirmation finale obligatoire. Les choix ambigus, les cibles de permutation et la valeur du Joker restent explicites. Un coup complet affiche ses flèches, départs, arrivées et captures avant validation. Chaque pion porte une bulle numérotée. Sur grand écran, les joueurs occupent une colonne latérale ; les membres de votre équipe partagent un badge de couleurs. L'accueil montre un plateau adapté au nombre de joueurs choisi.
+
+Le survol de l'historique est temporaire ; quitter le bouton ou son focus efface l'aperçu. Au toucher, le bouton Effacer l'aperçu permet de le retirer. Le dialogue ajuste le plateau entier à son cadre. Le journal textuel conserve les événements sans remplacer les traces géométriques.
+
+L'écran `/admin`, accessible depuis l'accueil, affiche l'UUID de votre session existante. Le propriétaire doit renseigner `ADMIN_USER_IDS` côté serveur (UUID séparés par des virgules), puis redéployer. Aucun UUID n'est activé automatiquement. Une session anonyme perdue ne récupère pas ses droits par pseudo : la liste doit être mise à jour par le propriétaire. Ne pas partager le profil de navigateur administrateur.
+
+L'administrateur peut lister tous les salons par pages de 30, consulter les cartes des bots et supprimer un salon, même commencé. La suppression exige de retaper son code et utilise sa version affichée ; un changement concurrent renvoie 409 et impose une nouvelle consultation. Elle efface aussi chat, membres, présence et signaux par cascade. Aucun retry automatique. Les clients connectés constatent la disparition à leur prochaine synchronisation. Les mains humaines, la pioche et les choix d'échange restent privés. Aucune migration nouvelle n'est nécessaire, les quatre migrations existantes restent requises.
+
+Détail de la stratégie et des scores : [BOTS.md](docs/BOTS.md).
+
+## Bots : échanges et mémoire
+
+Les bots évaluent désormais les cartes à donner selon les entrées exactes, la profondeur des maisons et les répartitions légales du 7. Ils conservent leur échange résolu et comptent les cartes observées jusqu'au prochain remélange. En fin de partie commune, ils comparent aussi les compléments possibles (par exemple 5 + 3 ou 6 + 2), avec priorité aux cartes connues et une estimation prudente des cartes inconnues. Ils ne consultent aucune main cachée. La mémoire persiste avec la partie ; les anciennes sauvegardes commencent sans souvenirs inventés. Voir [BOTS.md](docs/BOTS.md) pour le détail et les limites.

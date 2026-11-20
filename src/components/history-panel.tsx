@@ -33,6 +33,8 @@ export function HistoryPanel({
           key={record.id}
           className={selected?.id === record.id ? 'selected' : ''}
           onMouseEnter={() => onSelect(record)}
+          onMouseLeave={() => onSelect(null)}
+          onBlur={() => onSelect(null)}
           onFocus={() => onSelect(record)}
           onClick={() => onSelect(record)}
           aria-pressed={selected?.id === record.id}
@@ -77,12 +79,23 @@ export function HistoryPanel({
       </p>
       {entries()}
       <details>
-        <summary>Événements de la partie</summary>
+        <summary>Journal de la partie</summary>
+        <p className="muted">
+          Messages textuels : distributions, échanges, coups et victoire. Les coups détaillés
+          au-dessus permettent de revoir les positions sur le plateau.
+        </p>
         {view.log.map((line, i) => (
           <p key={i}>{line}</p>
         ))}
       </details>
-      <dialog ref={dialog} className="history-dialog" onClose={() => setExpanded(false)}>
+      <dialog
+        ref={dialog}
+        className="history-dialog"
+        onClose={() => {
+          setExpanded(false);
+          onSelect(null);
+        }}
+      >
         <header>
           <h2>Revoir les coups</h2>
           <button autoFocus onClick={() => setExpanded(false)}>

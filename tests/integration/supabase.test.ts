@@ -51,6 +51,10 @@ test(
         null,
       );
       for (const client of [anon, ...users]) {
+        assert.ok(
+          (await client.from('game_rooms').delete().eq('code', code)).error,
+          'Suppression directe interdite au membre, tiers et anonyme.',
+        );
         assert.ok((await client.from('room_presence').select('*').eq('room_code', code)).error);
         assert.ok(
           (
@@ -293,6 +297,22 @@ test(
         [],
       );
       assert.ok((await admin.rpc('touch_room_presence', { ...touch, p_version: 7 })).error);
+      const staleDelete = await admin
+        .from('game_rooms')
+        .delete()
+        .eq('code', code)
+        .eq('version', 6)
+        .select('code');
+      assert.equal(staleDelete.error, null);
+      assert.deepEqual(staleDelete.data, []);
+      const concurrentDeletes = await Promise.all([
+        admin.from('game_rooms').delete().eq('code', code).eq('version', 7).select('code'),
+        admin.from('game_rooms').delete().eq('code', code).eq('version', 7).select('code'),
+      ]);
+      assert.ok(concurrentDeletes.every((r) => !r.error));
+      assert.equal(concurrentDeletes.filter((r) => r.data?.length === 1).length, 1);
+      for (const table of ['room_members', 'room_events', 'room_messages', 'room_presence'])
+        assert.deepEqual((await admin.from(table).select('*').eq('room_code', code)).data, []);
       const limits = await Promise.all(
         Array.from({ length: 5 }, () =>
           admin.rpc('consume_rate_limit', { p_key: rateKey, p_max: 2, p_seconds: 60 }),

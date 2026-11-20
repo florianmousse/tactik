@@ -1,3 +1,4 @@
+import { emptyKnowledge, memoriesFor, observeCards } from './card-knowledge';
 import {
   CARDS,
   type Card,
@@ -89,10 +90,15 @@ export function createGame(
   return g;
 }
 function deal(g: Game, random: () => number) {
+  for (const memory of memoriesFor(g)) {
+    memory.known = [];
+    delete memory.exchange;
+  }
   const count = g.players.length === 2 ? 6 : 4;
   for (let c = 0; c < count; c++)
     for (let offset = 1; offset <= g.players.length; offset++) {
       if (!g.deck.length) {
+        g.memories = g.players.map(emptyKnowledge);
         g.deck = shuffle(g.discard, random);
         g.discard = [];
       }
@@ -124,6 +130,11 @@ export function exchange(given: Game, actor: number, index: number): Game {
           ? (i + 1) % g.players.length
           : (i + g.players.length / 2) % g.players.length;
       g.hands[recipient].push(card);
+      const sender =
+        g.players.length <= 3 ? (i - 1 + g.players.length) % g.players.length : recipient;
+      const memory = memoriesFor(g)[i];
+      memory.exchange = { given: card, received: cards[sender], recipient, sender, round: g.round };
+      memory.known = [{ player: recipient, card }];
     });
     g.phase = 'play';
     g.log.unshift('Les cartes ont été échangées.');
@@ -253,9 +264,18 @@ function candidates(
 // All legal full-card actions, including ordered partitions of the seven.
 export function legalPlays(g: Game, actor: number, onlyFirst = false): Play[] {
   if (g.phase !== 'play' || g.turn !== actor) return [];
+  return playsForHand(g, actor, g.hands[actor], onlyFirst);
+}
+// Hypothetical cards supplied explicitly, using public positions only.
+export function playsForHand(
+  g: Pick<Game, 'players' | 'pieces'>,
+  actor: number,
+  hand: Card[],
+  onlyFirst = false,
+): Play[] {
   const output: Play[] = [];
-  for (let index = 0; index < g.hands[actor].length; index++) {
-    const printed = g.hands[actor][index];
+  for (let index = 0; index < hand.length; index++) {
+    const printed = hand[index];
     for (const card of printed === 'joker' ? CARDS : [printed]) {
       const identity = printed === 'joker' ? { as: card } : {};
       if (card !== 7) {
@@ -393,6 +413,7 @@ export function play(given: Game, actor: number, action: Play, random: () => num
     g.pieces = simulation.pieces;
     changes = simulation.changes;
   }
+  observeCards(g, actor, [printed], true);
   g.hands[actor].splice(action.cardIndex, 1);
   g.discard.push(printed);
   rememberTurn(g, {
@@ -439,6 +460,7 @@ export function canDiscardHand(g: Game, actor: number): boolean {
 export function discardHand(given: Game, actor: number, random: () => number): Game {
   requireRule(canDiscardHand(given, actor), 'La main ne peut pas être défaussée entièrement.');
   const g = structuredClone(given);
+  observeCards(g, actor, g.hands[actor], false);
   g.discard.push(...g.hands[actor]);
   g.hands[actor] = [];
   rememberTurn(g, { actor, card: null, kind: 'discard-hand', changes: [] });
@@ -450,9 +472,10 @@ export function discardHand(given: Game, actor: number, random: () => number): G
 export function viewFor(g: Game, id: string): View {
   const me = g.players.findIndex((p) => p.id === id);
   requireRule(me >= 0, 'Accès refusé.');
-  const { hands, deck, exchanges, ...publicState } = structuredClone(g);
+  const { hands, deck, exchanges, memories, ...publicState } = structuredClone(g);
   return {
     ...publicState,
+    knowledge: memories?.[me] ?? emptyKnowledge(),
     hand: hands[me],
     handCounts: hands.map((h) => h.length),
     exchanged: exchanges.map((i) => i !== null),

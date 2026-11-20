@@ -49,12 +49,17 @@ export function PlayerList({
               {p.colors.map((c) => COLOR_NAMES[c]).join(' + ')} · {view.handCounts[seat]} cartes
               {view.phase === 'exchange' && view.exchanged[seat] ? ' ✓' : ''}
             </small>
-            {seat === view.me && (
-              <strong className="partner-label">
-                {partner
-                  ? `Votre coéquipier : ${partner.name} (${partner.colors.map((c) => COLOR_NAMES[c]).join(', ')})`
-                  : 'Vous jouez vos deux couleurs'}
-              </strong>
+            {partner && p.team === me.team && (
+              <span
+                className="team-badge"
+                title={`Votre équipe : ${me.name} + ${partner.name}`}
+                aria-label={`Votre équipe : ${me.name} + ${partner.name}`}
+              >
+                <span aria-hidden="true">⌘</span>
+                {[...me.colors, ...partner.colors].map((c) => (
+                  <i key={c} style={{ background: PALETTE[c] }} />
+                ))}
+              </span>
             )}
           </div>
         );

@@ -115,3 +115,28 @@ La rotation aligne maintenant la reserve propre horizontalement dans le quart in
 Accueil reorganise : une rubrique visible a la fois (public, creation, code, bots, parties recentes), details des parties et apercu du plateau repliables. Les options du solo sont accessibles dans sa propre rubrique. Validation apres reorganisation : `npm run check` reussi (49 tests et TypeScript), puis `npm run build` reussi. Recette visuelle bureau/mobile et navigation interactive restant a effectuer ; les limites d'acces navigateur precedentes restent applicables. Pas de deploiement.
 
 Les fiches sont relues par sync, avec les droits de membre existants ; aucune nouvelle API ni migration. Seuls les codes restent dans localStorage. Le resume en memoire exclut mains, messages et etat complet. Attente, echange et victoire (y compris equipe zero), partenaire et absence de main sont couverts par un test. `npm run check` reussi : 49 tests et TypeScript, puis `npm run build` reussi. Format des fichiers modifies verifie avec Prettier. Recette interactive restante : victoire distante pendant une absence, retour accueil, actualisation, acces perdu, panne reseau et lisibilite mobile. Integration Supabase non executee ; aucune validation multijoueur reelle revendiquee. Aucun deploiement effectue.
+
+## Sélections, affichage et administration - 20 novembre 2026
+
+Modifications : dernière carte et pion unique sélectionnés automatiquement, coup complet simulé avant confirmation, bulles numérotées, déplacement case par case, fiches latérales sur grand écran, badge d'équipe, plateau d'accueil variable, survol temporaire et plateau ajusté dans le dialogue historique. Les bots attendent trois secondes entre déclenchements. La stratégie de décision reste inchangée et est documentée dans BOTS.md.
+
+Une interface et une API admin séparées permettent aux UUID autorisés dans ADMIN_USER_IDS de lister tous les salons, consulter uniquement les mains des bots et supprimer par code/version avec cascade. Aucun droit n'est activé automatiquement et aucune donnée réelle n'a été supprimée. Tests locaux ajoutés : refus par défaut, UUID exact, schémas stricts et projection sans mains humaines, pioche ou choix d'échange. Tests SQL étendus : DELETE interdit au membre/tiers/anonyme, version périmée, suppressions concurrentes et cascades.
+
+Vérifications exécutées :
+
+- `npm run check` : réussi, 51 tests et TypeScript strict.
+- `npm run build` : réussi, routes /admin et /api/admin incluses.
+- `node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` : un test ignoré, RUN_SUPABASE_INTEGRATION non activé. Aucun accès multijoueur ou administrateur réel validé.
+- Contrôle visuel interactif non exécuté : localhost inaccessible au navigateur intégré (ERR_CONNECTION_TIMED_OUT), puis Firefox refusé par Computer Use car sa politique d'URL n'est pas prise en charge pour ce navigateur Windows.
+
+Recette restante : bureau/mobile, dernière carte, pion unique avec embranchement maison/parcours, permutation, 7 avec capture d'un pion déjà déplacé, annulation, flèches avant validation, survol/focus/toucher, dialogue et Echap, animations réduites et numéros depuis chaque orientation. Sur un Supabase de test, vérifier les réponses HTTP admin 401/403, UUID autorisé et révoqué, mains des seuls bots, suppression en attente et en cours, conflit 409, cascades et disparition chez deux clients. Aucun déploiement effectué ; ADMIN_USER_IDS reste à configurer par le propriétaire.
+
+## Echanges tactiques et mémoire des bots - 20 novembre 2026
+
+Avant correction, les trois scénarios de don exact (8, 2 en maison, 7 fractionnable) échouaient : le bot donnait le premier 5. Un quatrième scénario a reproduit le don d'un 5 préparant un 3 épuisé au lieu d'un 6 préparant un 2 possible. Après correction, ces scénarios passent.
+
+Onze tests ajoutés couvrent les dons, le refus d'un 7 partiellement consommé, les suites 5 + 3 / 6 + 2 au jeu et à l'échange, la carte donnée encore connue, l'indépendance de la décision vis-à-vis de la vraie main cachée, l'échange simultané privé, la sérialisation JSON, les destinataires à 2/3/8, la défausse complète non révélée, la nouvelle donne, le remélange, les anciens états, les doubles paquets et le Joker compté sous sa valeur imprimée. Les transitions testées préservent leurs entrées.
+
+Vérifications exécutées : `npm run check` réussi (62 tests et TypeScript strict), puis `npm run build` réussi après une relance : la première tentative avait rencontré un EPERM Windows dans le dossier généré .next. `npm run format:check` réussi. `node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` a ignoré son test, RUN_SUPABASE_INTEGRATION n'étant pas activé. Aucun multijoueur réel validé.
+
+Pas de modification d'interface ni de nouvelle migration. Recette restante sur Supabase de test : mémoire propre à chaque identité après échange simultané, absence des mémoires tierces dans les réponses, reprise après reconnexion, deux bot-tick concurrents et persistance unique de l'observation avec le CAS. La mémoire ajoute uniquement un champ privé optionnel au JSON et une projection propre au demandeur, sans nouvelle commande ni droit SQL. Aucun déploiement effectué.

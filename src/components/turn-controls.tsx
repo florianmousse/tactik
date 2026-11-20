@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { CARDS, type BaseCard, type Move, type Play, type View } from '@/game/types';
 import { cardSymbol, cardTitle, moveLabel, COLOR_NAMES } from '@/game/labels';
 import { PALETTE } from './board';
@@ -11,6 +11,7 @@ export function TurnControls({
   onPiece,
   onPlayable,
   onDestinations,
+  onPreview,
   interaction,
   onExchange,
   onPlay,
@@ -22,6 +23,7 @@ export function TurnControls({
   onPiece: (id: string | undefined) => void;
   onPlayable: (ids: string[]) => void;
   onDestinations: (moves: Move[]) => void;
+  onPreview: (action: Play | null) => void;
   interaction: RefObject<{ piece: (id: string) => void; move: (move: Move) => void }>;
   onExchange: (index: number) => void;
   onPlay: (action: Play) => void;
@@ -39,7 +41,7 @@ export function TurnControls({
     view.exchanged[view.me],
   ]);
   useEffect(() => {
-    setCard(null);
+    setCard(view.hand.length === 1 ? 0 : null);
     setDraft([]);
     setAs(undefined);
     onPiece(undefined);
@@ -72,6 +74,22 @@ export function TurnControls({
   }, [idsKey, onPlayable]);
   const complete = draft.length > 0 && actions.some((p) => p.moves.length === draft.length),
     discard = isTurn && !view.options.length;
+  const autoRevision = useRef(revision);
+  const autoKey = JSON.stringify([revision, card, as, draft, ids]);
+  useEffect(() => {
+    if (autoRevision.current !== revision) {
+      autoRevision.current = revision;
+      return;
+    }
+    if (!isTurn || busy || complete || ids.length !== 1) return;
+    const choices = next.filter((m) => m.piece === ids[0]);
+    onPiece(ids[0]);
+    if (choices.length === 1 && choices[0].kind !== 'swap') setDraft([...draft, choices[0]]);
+  }, [autoKey, busy]);
+  const previewKey = JSON.stringify(complete ? { cardIndex: card, moves: draft, as } : null);
+  useEffect(() => {
+    onPreview(complete && card !== null ? { cardIndex: card, moves: draft, as } : null);
+  }, [previewKey, onPreview]);
   const shownMoves = complete
     ? draft
     : next.filter((m) => !selectedPiece || m.piece === selectedPiece);
@@ -186,6 +204,8 @@ export function TurnControls({
             </ol>
             <button
               onClick={() => {
+                setCard(null);
+                setAs(undefined);
                 setDraft([]);
                 onPiece(undefined);
               }}

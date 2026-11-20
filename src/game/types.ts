@@ -39,6 +39,12 @@ export type TurnRecord = {
   kind: 'play' | 'discard' | 'discard-hand';
   changes: PieceChange[];
 };
+export type CardKnowledge = {
+  // Cards observed leaving hands since the last discard reshuffle.
+  spent: Partial<Record<Card, number>>;
+  known: { player: number; card: Card }[];
+  exchange?: { given: Card; received: Card; recipient: number; sender: number; round: number };
+};
 export type Game = {
   players: Player[];
   pieces: Piece[];
@@ -54,8 +60,10 @@ export type Game = {
   round: number;
   jokers?: boolean;
   history?: TurnRecord[];
+  memories?: CardKnowledge[];
 };
-export type View = Omit<Game, 'hands' | 'deck' | 'exchanges'> & {
+export type View = Omit<Game, 'hands' | 'deck' | 'exchanges' | 'memories'> & {
+  knowledge?: CardKnowledge;
   hand: Card[];
   handCounts: number[];
   exchanged: boolean[];
