@@ -113,7 +113,7 @@ Appliquer aussi `supabase/migrations/202611180003_public_rooms.sql` avant de met
 
 Les nouvelles invitations ont 8 caracteres sans I, O, 0 ou 1 ; les anciens codes a 12 caracteres restent valables. Le createur peut exclure un invite avant le lancement. Cette identite ne peut plus rejoindre ce salon, lire son chat ni recevoir ses signaux.
 
-Un coup simple demande carte, pion, puis une seule confirmation. Les destinations sont affichees sur le plateau ; les choix de maison et les segments du 7 restent explicites. Pour permuter, choisir son pion puis le pion cible directement sur le plateau, ou utiliser les boutons nommes. Le chat se replie avec son bouton et reste dans le panneau lateral sur mobile. Un bandeau rappelle vos couleurs, votre equipe et votre partenaire.
+Un coup simple demande carte, pion, puis une seule confirmation. Les destinations sont affichees sur le plateau ; les choix de maison et les segments du 7 restent explicites. Pour permuter, choisir les deux pions dans un ordre quelconque sur le plateau ou avec les boutons nommés, puis valider. Le chat est ouvert par défaut en ligne et se replie avec son bouton et reste dans le panneau lateral sur mobile. Un bandeau rappelle vos couleurs, votre equipe et votre partenaire.
 
 ## Quitter, reprendre et voir la presence
 
@@ -121,7 +121,7 @@ Le bouton Quitter la table est disponible en ligne et en solo. Avant le lancemen
 
 Les parties recentes affichent les participants et bots, les places, le Joker, la donne, votre couleur et votre partenaire. Les parties terminees indiquent les gagnants et proposent Voir le resultat. Ces informations sont relues via la synchronisation authentifiee a l'accueil, puis chaque minute si l'onglet est visible, et avec Actualiser les parties. Seuls les codes sont conserves sur disque ; une erreur de lecture est affichee sans effacer la partie. Les salons publics restent limites aux parties ouvertes a rejoindre.
 
-La reprise utilise la session Supabase existante, jamais le pseudo comme preuve d'identite. Une erreur de reseau ou d'origine ne supprime plus la table ni son lien. Reprendre / synchroniser relit l'etat, sans rejouer un coup dont la sauvegarde est incertaine. Si la session anonyme a ete effacee, un pseudo identique ne permet pas de recuperer une place ; garder le meme navigateur et profil.
+La reprise utilise la session Supabase existante, jamais le pseudo comme preuve d'identite. Une erreur de reseau ou d'origine ne supprime plus la table ni son lien. En cas d'échec de synchronisation, Réessayer maintenant relit l'état du salon. La reprise automatique reste active. Si la session anonyme a ete effacee, un pseudo identique ne permet pas de recuperer une place ; garder le meme navigateur et profil.
 
 La migration `202611180004_presence_leave.sql` ajoute la presence privee : Present, En arriere-plan, Absent et Bot. Un signal est envoye toutes les 15 secondes tant que la table est visible, et lors des changements de visibilite. Sans signal pendant 45 secondes, le joueur est considere absent lors de la prochaine lecture (jusqu'a 15 secondes de delai supplementaire). Ce statut ne mesure pas les clics ni l'attention du joueur. Plusieurs onglets sont pris en compte.
 
@@ -141,7 +141,7 @@ L'historique conserve les 40 derniers coups avec leurs positions publiques. Surv
 
 ## Ergonomie et administration
 
-La dernière carte est sélectionnée automatiquement. Si une carte ne permet de jouer qu'un pion, ce pion est sélectionné ; un déplacement unique est préparé, avec confirmation finale obligatoire. Les choix ambigus, les cibles de permutation et la valeur du Joker restent explicites. Un coup complet affiche ses flèches, départs, arrivées et captures avant validation. Chaque pion porte son numéro au centre. Sur grand écran, les joueurs occupent une colonne latérale ; les membres de votre équipe partagent un badge de couleurs. L'accueil montre un plateau adapté au nombre de joueurs choisi.
+La dernière carte est sélectionnée automatiquement. Si une carte ne permet de jouer qu'un pion, ce pion est sélectionné ; un déplacement unique est préparé, avec confirmation finale obligatoire. Les choix ambigus, les cibles de permutation et la valeur du Joker restent explicites. Un coup complet affiche ses flèches, départs, arrivées et captures avant validation. Chaque pion porte son numéro au centre. Un losange sombre bordé de clair identifie les pieux protégés. Sur grand écran, les joueurs occupent une colonne latérale ; les membres de votre équipe partagent un badge de couleurs. L'accueil montre un plateau adapté au nombre de joueurs choisi.
 
 Le coup sélectionné reste visible pendant le défilement de la liste. Le dialogue ajuste le plateau entier à son cadre. Le journal textuel conserve les événements sans remplacer les traces géométriques.
 

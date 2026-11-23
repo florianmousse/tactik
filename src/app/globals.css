@@ -827,7 +827,7 @@ legend {
     padding: 5px 9px;
     flex: 0 0 auto;
   }
-  .session-panel:has(.chat-panel) {
+  .session-panel:has(.table-chat:not([hidden])) {
     max-height: 27dvh;
     min-height: 160px;
     flex: 1 1 auto;
@@ -1133,7 +1133,7 @@ legend {
     padding: 6px;
     margin-bottom: 4px;
   }
-  .game-sidebar:has(.chat-panel) .turn-controls {
+  .game-sidebar:has(.table-chat:not([hidden])) .turn-controls {
     max-height: 25dvh;
   }
   .game-sidebar {
@@ -1166,7 +1166,7 @@ legend {
     flex: none;
   }
   .turn-controls,
-  .game-sidebar:has(.chat-panel) .turn-controls {
+  .game-sidebar:has(.table-chat:not([hidden])) .turn-controls {
     max-height: none;
   }
   .move-editor {
@@ -1180,7 +1180,7 @@ legend {
     min-height: 44px;
   }
   .session-panel,
-  .session-panel:has(.chat-panel) {
+  .session-panel:has(.table-chat:not([hidden])) {
     max-height: none;
     min-height: 48px;
   }
@@ -1492,4 +1492,40 @@ legend {
 }
 .seat > span {
   width: auto;
+}
+
+.table-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+.table-panel-heading button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.table-panel-heading .chat-toggle {
+  color: var(--ink);
+  background: transparent;
+  border-color: transparent;
+  font-weight: bold;
+}
+.table-chat:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-top: 6px;
+}
+.session-panel:not(:has(.table-chat:not([hidden]))) {
+  flex: 0 0 auto;
+  min-height: auto;
+  max-height: none;
+}
+.last-event {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
 }

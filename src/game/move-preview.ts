@@ -17,3 +17,16 @@ export function moveDestination(view: View, move: Move): { color: number; positi
     }
   return { color: piece.color, position };
 }
+
+// The server enumerates swaps from the controlled pawn. Either pawn may be picked first.
+export function swapChoices(moves: Extract<Move, { kind: 'swap' }>[], first?: string) {
+  const pairs = moves.flatMap((move) => {
+    if (first === move.piece) return [{ id: move.target, move }];
+    if (first === move.target) return [{ id: move.piece, move }];
+    return [];
+  });
+  const ids = first
+    ? [first, ...pairs.map((pair) => pair.id)]
+    : moves.flatMap((move) => [move.piece, move.target]);
+  return { ids: [...new Set(ids)], pairs };
+}

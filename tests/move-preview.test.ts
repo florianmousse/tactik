@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, play, viewFor } from '../src/game/engine';
-import { moveDestination } from '../src/game/move-preview';
+import { moveDestination, swapChoices } from '../src/game/move-preview';
 
 test('destinations : sortie, recul, maison, permutation et 7 correspondent au moteur', () => {
   for (const card of [1, -4, 7, 'swap', 12] as const) {
@@ -29,4 +29,29 @@ test('destinations : sortie, recul, maison, permutation et 7 correspondent au mo
     }
     assert.deepEqual(view.pieces, game.pieces);
   }
+});
+
+test('permutation : cible adverse en premier, chaque pion propre reste un choix explicite', () => {
+  const game = createGame(
+    Array.from({ length: 4 }, (_, i) => ({ id: String(i), name: String(i) })),
+    () => 0.4,
+  );
+  game.phase = 'play';
+  game.turn = 0;
+  game.hands[0] = ['swap'];
+  for (const [id, position] of Object.entries({ '0-0': 1, '0-1': 2, '2-0': 3, '2-1': 16 })) {
+    const piece = game.pieces.find((p) => p.id === id)!;
+    piece.position = position;
+    piece.stake = id === '2-1';
+  }
+  const swaps = viewFor(game, '0')
+    .options.flatMap((p) => p.moves)
+    .filter((m) => m.kind === 'swap');
+  assert.deepEqual(swapChoices(swaps).pairs, []);
+  assert.ok(!swapChoices(swaps).ids.includes('2-1'));
+  const choices = swapChoices(swaps, '2-0');
+  assert.deepEqual(choices.pairs.map((p) => p.id).sort(), ['0-0', '0-1']);
+  const chosen = choices.pairs.find((p) => p.id === '0-1')!.move;
+  assert.deepEqual(chosen, swapChoices(swaps, '0-1').pairs.find((p) => p.id === '2-0')!.move);
+  assert.equal(chosen.piece, '0-1');
 });

@@ -148,3 +148,9 @@ Pas de modification d'interface ni de nouvelle migration. Recette restante sur S
 Chrome local, entraînement à huit joueurs : huit fiches visibles sans défilement interne et huit repères de réserve à 390 x 844 et 1440 x 900, sans débordement horizontal. Echange effectué, sept coups de bots consultables. Le plateau du dialogue reste visible à la même hauteur lors du défilement du journal sur les deux formats. Fermeture par Echap vérifiée.
 
 `node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` : test ignoré, intégration non activée. A vérifier sur Supabase de test : composition des équipes par l'hôte, refus pour l'invité, synchronisation après reconnexion, conflit entre modification et lancement. Pas de déploiement.
+
+## Pieux, permutation et panneau de table
+
+`npm run check` réussi (65 tests et TypeScript strict), puis `npm run build` réussi. Un scénario de permutation couvre la cible adverse choisie en premier, le choix entre deux pions propres, le refus d'un pieu adverse et la sélection dans l'ordre inverse.
+
+Chrome local à 390 x 844 et 1440 x 900, avec réponses API simulées : chat ouvert à l'entrée, brouillon conservé après consultation de l'historique, permutation bloquée après un seul choix puis prête après le second, marque de pieu distincte du pion ordinaire. Une erreur de synchronisation simulée affiche Réessayer maintenant ; une lecture réussie le masque. Ces contrôles ne valident pas la connexion à Supabase ni le chat entre deux clients réels.

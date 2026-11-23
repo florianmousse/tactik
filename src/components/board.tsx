@@ -363,6 +363,16 @@ export function Board({
                 />
               )}
               <g filter={`url(#${uid}-peg-shadow)`}>
+                {p.stake && (
+                  <g aria-hidden="true" transform={`rotate(${-orientation.angle})`}>
+                    <path
+                      d="M0 -16 L15 0 L0 16 L-15 0 Z"
+                      fill="#29271f"
+                      stroke="#fff4d5"
+                      strokeWidth="2"
+                    />
+                  </g>
+                )}
                 <circle
                   r="9"
                   fill={PALETTE[p.color]}

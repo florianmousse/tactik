@@ -37,8 +37,9 @@ export function GameApp() {
     piece: () => {},
     move: () => {},
   });
-  const [tab, setTab] = useState<'create' | 'join' | 'public' | 'recent' | 'solo'>('public'),
-    [panel, setPanel] = useState<'log' | 'chat' | null>(null);
+  const [tab, setTab] = useState<'create' | 'join' | 'public' | 'recent' | 'solo'>('public');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
@@ -90,7 +91,7 @@ export function GameApp() {
   }, [room?.code]);
   const messageKey = room?.messages.map((m) => m.id).join(',') ?? '';
   useEffect(() => {
-    if (!room || !pageVisible || (room.game && panel !== 'chat')) return;
+    if (!room || !pageVisible || (room.game && (!chatOpen || historyOpen))) return;
     const ids = room.messages.map((m) => m.id);
     setChatSeen({ code: room.code, ids });
     try {
@@ -98,7 +99,7 @@ export function GameApp() {
     } catch {
       /* Storage may be disabled. */
     }
-  }, [messageKey, room?.code, panel, pageVisible, Boolean(room?.game)]);
+  }, [messageKey, room?.code, chatOpen, historyOpen, pageVisible, Boolean(room?.game)]);
   const alive = useRef(true);
   const generation = useRef(0);
   const roomRef = useRef(room);
@@ -106,7 +107,7 @@ export function GameApp() {
   const connection = useRef<string | null>(null);
   const syncing = useRef(false);
   const [recentRooms, setRecentRooms] = useState<string[]>([]);
-  const [connectionState, setConnectionState] = useState<'ok' | 'reconnecting'>('ok');
+  const [connectionError, setConnectionError] = useState('');
   const nameInput = useRef<HTMLInputElement>(null);
   function saveRecent(code: string) {
     setRecentRooms((previous) => {
@@ -127,9 +128,10 @@ export function GameApp() {
     setPlayable([]);
     setDestinations([]);
     setSelectedPiece(undefined);
-    setPanel(null);
+    setHistoryOpen(false);
+    setChatOpen(true);
     setTab('public');
-    setConnectionState('ok');
+    setConnectionError('');
     history.replaceState(null, '', location.pathname);
   }
   async function leaveCurrent() {
@@ -253,14 +255,16 @@ export function GameApp() {
         }
         if (alive.current && epoch === generation.current) {
           receive(next);
-          setConnectionState('ok');
+          setConnectionError('');
         }
       } catch (e) {
         if (alive.current && epoch === generation.current) {
-          setConnectionState('reconnecting');
-          setError((e as Error).message);
+          setConnectionError((e as Error).message);
           // Origin failures and transport errors must never erase the current table.
-          if (hasLostRoomAccess(e)) returnHome();
+          if (hasLostRoomAccess(e)) {
+            setError((e as Error).message);
+            returnHome();
+          }
         }
       } finally {
         syncing.current = false;
@@ -398,7 +402,7 @@ export function GameApp() {
       const next = await api(command, command.type === 'create' || command.type === 'join');
       if (epoch !== generation.current) return false;
       receive(next);
-      setConnectionState('ok');
+      setConnectionError('');
       saveRecent(next.code);
       try {
         localStorage.setItem('taktik-name', name.trim());
@@ -407,7 +411,8 @@ export function GameApp() {
         const address = new URL(location.href);
         address.searchParams.set('salon', next.code);
         history.replaceState(null, '', address);
-        setPanel(null);
+        setHistoryOpen(false);
+        setChatOpen(true);
       }
       return true;
     } catch (e) {
@@ -432,7 +437,8 @@ export function GameApp() {
       ),
     );
     setError('');
-    setPanel(null);
+    setHistoryOpen(false);
+    setChatOpen(true);
   }
   function localAction(action: () => Game) {
     try {
@@ -508,7 +514,7 @@ export function GameApp() {
       if (epoch !== generation.current) return;
       receive(next);
       saveRecent(next.code);
-      setConnectionState('ok');
+      setConnectionError('');
       history.replaceState(null, '', `${location.pathname}?salon=${next.code}`);
     } catch (e) {
       setError((e as Error).message);
@@ -542,15 +548,11 @@ export function GameApp() {
           )}
         </nav>
       </header>
-      {room && (
+      {room && !local && connectionError && (
         <div className="connection-status" role="status">
-          <span>
-            {connectionState === 'ok'
-              ? 'Connecté au salon'
-              : 'Connexion interrompue - votre place est conservée'}
-          </span>
-          <button disabled={busy} onClick={() => synchronize(room.code, true)}>
-            Reprendre / synchroniser
+          <span>Synchronisation interrompue. {connectionError}</span>
+          <button disabled={busy} onClick={() => synchronize(room.code)}>
+            Réessayer maintenant
           </button>
         </div>
       )}
@@ -570,8 +572,8 @@ export function GameApp() {
           </button>
         </div>
       )}
-      {unread.length > 0 && room?.game && panel !== 'chat' && (
-        <button className="chat-notification" onClick={() => setPanel('chat')} aria-live="polite">
+      {unread.length > 0 && room?.game && !chatOpen && !historyOpen && (
+        <button className="chat-notification" onClick={() => setChatOpen(true)} aria-live="polite">
           {unread.length} nouveau{unread.length > 1 ? 'x' : ''} message
           {unread.length > 1 ? 's' : ''} - {unread.at(-1)?.name} - Ouvrir le chat
         </button>
@@ -1056,7 +1058,9 @@ export function GameApp() {
               />
             </div>
             <div className="board-tools">
-              <span>D : donneur · 1 : commence la donne · {view.deckCount} cartes en pioche</span>
+              <span>
+                ◆ Pieu · D : donneur · 1 : commence la donne · {view.deckCount} cartes en pioche
+              </span>
               <button aria-pressed={zoom} onClick={() => setZoom(!zoom)}>
                 {zoom ? 'Ajuster le plateau' : 'Agrandir'}
               </button>
@@ -1090,40 +1094,36 @@ export function GameApp() {
             />
             {local && showBotHands && <BotHands game={local} />}
             <section className="session-panel">
-              <div className="tabs">
-                <button
-                  className={panel === 'log' ? 'selected' : ''}
-                  aria-pressed={panel === 'log'}
-                  onClick={() => {
-                    setPanel(panel === 'log' ? null : 'log');
-                  }}
-                  aria-expanded={panel === 'log'}
-                >
+              <header className="table-panel-heading">
+                {room && !local ? (
+                  <button
+                    type="button"
+                    className="chat-toggle"
+                    aria-expanded={chatOpen}
+                    onClick={() => setChatOpen(!chatOpen)}
+                  >
+                    Chat du salon{' '}
+                    {unread.length > 0 && !chatOpen && <small>({unread.length} non lus)</small>}
+                    <span aria-hidden="true">{chatOpen ? '▾' : '▸'}</span>
+                  </button>
+                ) : (
+                  <strong>Journal de la table</strong>
+                )}
+                <button aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
                   Historique
                 </button>
-                {room && !local && (
-                  <button
-                    className={panel === 'chat' ? 'selected' : unread.length ? 'has-unread' : ''}
-                    aria-pressed={panel === 'chat'}
-                    onClick={() => {
-                      setPanel(panel === 'chat' ? null : 'chat');
-                    }}
-                    aria-expanded={panel === 'chat'}
-                  >
-                    {panel === 'chat'
-                      ? 'Fermer le chat'
-                      : `Chat${unread.length ? ` - ${unread.length} non lus` : ''}`}
-                  </button>
-                )}
-              </div>
-              {panel === 'chat' && room && !local ? (
-                <Chat
-                  messages={room.messages}
-                  onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
-                />
-              ) : panel === 'log' ? (
-                <HistoryPanel view={view} onClose={() => setPanel(null)} />
-              ) : null}
+              </header>
+              {room && !local ? (
+                <div className="table-chat" hidden={!chatOpen}>
+                  <Chat
+                    messages={room.messages}
+                    onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
+                  />
+                </div>
+              ) : (
+                <p className="last-event">{view.log[0]}</p>
+              )}
+              {historyOpen && <HistoryPanel view={view} onClose={() => setHistoryOpen(false)} />}
             </section>
           </aside>
         </div>

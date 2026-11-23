@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { CARDS, type BaseCard, type Move, type Play, type View } from '@/game/types';
 import { cardSymbol, cardTitle, moveLabel, COLOR_NAMES } from '@/game/labels';
+import { swapChoices } from '@/game/move-preview';
 import { PALETTE } from './board';
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 export function TurnControls({
@@ -65,12 +66,13 @@ export function TurnControls({
     ).values(),
   ];
   const ids = [...new Set(next.map((m) => m.piece))];
-  const targets = next
-    .filter((m) => m.kind === 'swap' && m.piece === selectedPiece)
-    .map((m) => (m.kind === 'swap' ? m.target : ''));
-  const idsKey = [...ids, ...targets].join(',');
+  const swaps = next.filter((move) => move.kind === 'swap');
+  const swapping = swaps.length > 0;
+  const swap = swapChoices(swaps, selectedPiece);
+  const playableIds = swapping ? swap.ids : ids;
+  const idsKey = playableIds.join(',');
   useEffect(() => {
-    onPlayable([...ids, ...targets]);
+    onPlayable(playableIds);
   }, [idsKey, onPlayable]);
   const complete = draft.length > 0 && actions.some((p) => p.moves.length === draft.length),
     discard = isTurn && !view.options.length;
@@ -81,7 +83,7 @@ export function TurnControls({
       autoRevision.current = revision;
       return;
     }
-    if (!isTurn || busy || complete || ids.length !== 1) return;
+    if (!isTurn || busy || complete || swapping || ids.length !== 1) return;
     const choices = next.filter((m) => m.piece === ids[0]);
     onPiece(ids[0]);
     if (choices.length === 1 && choices[0].kind !== 'swap') setDraft([...draft, choices[0]]);
@@ -92,7 +94,9 @@ export function TurnControls({
   }, [previewKey, onPreview]);
   const shownMoves = complete
     ? draft
-    : next.filter((m) => !selectedPiece || m.piece === selectedPiece);
+    : swapping
+      ? []
+      : next.filter((m) => !selectedPiece || m.piece === selectedPiece);
   const shownKey = JSON.stringify(shownMoves);
   useEffect(() => {
     onDestinations(shownMoves);
@@ -104,11 +108,10 @@ export function TurnControls({
   }
   function selectPiece(id: string) {
     if (busy) return;
-    const target = next.find(
-      (m) => m.kind === 'swap' && m.piece === selectedPiece && m.target === id,
-    );
-    if (target) {
-      addMove(target);
+    if (swapping) {
+      const move = swap.pairs.find((pair) => pair.id === id)?.move;
+      if (move) addMove(move);
+      else if (swap.ids.includes(id)) onPiece(id === selectedPiece ? undefined : id);
       return;
     }
     const choices = next.filter((m) => m.piece === id);
@@ -150,9 +153,15 @@ export function TurnControls({
                   ? 'Choisir la valeur du Joker'
                   : complete
                     ? 'Coup prêt'
-                    : selectedPiece
-                      ? 'Sélectionner un déplacement'
-                      : 'Sélectionner un pion';
+                    : swapping
+                      ? !selectedPiece
+                        ? 'Choisir le premier pion à permuter'
+                        : ids.includes(selectedPiece)
+                          ? 'Choisir le pion à échanger avec lui'
+                          : 'Choisir votre pion à permuter'
+                      : selectedPiece
+                        ? 'Sélectionner un déplacement'
+                        : 'Sélectionner un pion';
   return (
     <section className="turn-controls" aria-label="Cartes et actions">
       <div className="turn-status" role="status">
@@ -220,7 +229,7 @@ export function TurnControls({
         )}
         {!complete && ids.length > 0 && (
           <div className="piece-choices" aria-label="Pions jouables">
-            {ids.map((id) => (
+            {playableIds.map((id) => (
               <button
                 key={id}
                 disabled={busy}
@@ -233,7 +242,7 @@ export function TurnControls({
             ))}
           </div>
         )}
-        {selectedPiece && !complete && (
+        {selectedPiece && !swapping && !complete && (
           <div className="move-options">
             {next
               .filter((m) => m.piece === selectedPiece)
