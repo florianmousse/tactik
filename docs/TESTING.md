@@ -140,3 +140,11 @@ Onze tests ajoutés couvrent les dons, le refus d'un 7 partiellement consommé, 
 Vérifications exécutées : `npm run check` réussi (62 tests et TypeScript strict), puis `npm run build` réussi après une relance : la première tentative avait rencontré un EPERM Windows dans le dossier généré .next. `npm run format:check` réussi. `node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` a ignoré son test, RUN_SUPABASE_INTEGRATION n'étant pas activé. Aucun multijoueur réel validé.
 
 Pas de modification d'interface ni de nouvelle migration. Recette restante sur Supabase de test : mémoire propre à chaque identité après échange simultané, absence des mémoires tierces dans les réponses, reprise après reconnexion, deux bot-tick concurrents et persistance unique de l'observation avec le CAS. La mémoire ajoute uniquement un champ privé optionnel au JSON et une projection propre au demandeur, sans nouvelle commande ni droit SQL. Aucun déploiement effectué.
+
+## Repères de table, équipes et relecture - 23 novembre 2026
+
+`npm run check` réussi (64 tests et TypeScript strict), puis `npm run build` réussi. La suite vérifie les jetons, le nombre de dos de cartes adverses et le schéma strict de la commande versionnée `swap-seats`.
+
+Chrome local, entraînement à huit joueurs : huit fiches visibles sans défilement interne et huit repères de réserve à 390 x 844 et 1440 x 900, sans débordement horizontal. Echange effectué, sept coups de bots consultables. Le plateau du dialogue reste visible à la même hauteur lors du défilement du journal sur les deux formats. Fermeture par Echap vérifiée.
+
+`node --env-file=.env.local --import tsx --test tests/integration/supabase.test.ts` : test ignoré, intégration non activée. A vérifier sur Supabase de test : composition des équipes par l'hôte, refus pour l'invité, synchronisation après reconnexion, conflit entre modification et lancement. Pas de déploiement.

@@ -42,3 +42,22 @@ test('premier rendu : HTML déterministe, avant stockage navigateur et session',
   assert.equal(first, second);
   assert.ok(first.includes('Votre pseudo'));
 });
+
+test('plateau : jetons de la donne et dos de cartes limités aux compteurs adverses', () => {
+  const game = createGame(
+    Array.from({ length: 4 }, (_, i) => ({ id: String(i), name: 'Joueur ' + i })),
+    () => 0.5,
+  );
+  const view = viewFor(game, '0');
+  view.handCounts = [5, 0, 1, 3];
+  const html = renderToStaticMarkup(
+    createElement(Board, { game: view, orient: true, playable: [], onPiece: () => {} }),
+  );
+  assert.equal(html.match(/role="img"/g)?.length, 4);
+  assert.equal(html.match(/width="12" height="17"/g)?.length, 4);
+  assert.match(html, new RegExp('aria-label="Joueur ' + view.dealer + ', [^"]+Donneur'));
+  assert.match(
+    html,
+    new RegExp('aria-label="Joueur ' + ((view.dealer + 1) % 4) + ', [^"]+Commence la donne'),
+  );
+});

@@ -50,6 +50,15 @@ export const commandSchema = z.discriminatedUnion('type', [
       active: z.boolean(),
     })
     .strict(),
+  z
+    .object({
+      type: z.literal('swap-seats'),
+      code,
+      version,
+      seat: z.number().int().min(1).max(7),
+      target: z.number().int().min(1).max(7),
+    })
+    .strict(),
   z.object({ type: z.literal('list') }).strict(),
   z
     .object({ type: z.literal('kick'), code, version, seat: z.number().int().min(1).max(7) })

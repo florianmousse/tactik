@@ -206,7 +206,19 @@ export async function dispatch(
     }
     if (command.version !== data.version)
       throw new HttpError(409, 'La partie a changé. Actualisez avant de jouer.');
-    if (command.type === 'kick') {
+    if (command.type === 'swap-seats') {
+      if (user !== room.host) throw new HttpError(403, "Seul l'hôte peut composer les équipes.");
+      if (room.game || room.capacity < 4 || room.people.length !== room.capacity)
+        throw new HttpError(409, 'Le salon doit être complet et en attente.');
+      const { seat, target } = command;
+      if (
+        !room.people[seat] ||
+        !room.people[target] ||
+        seat % (room.capacity / 2) === target % (room.capacity / 2)
+      )
+        throw new HttpError(400, 'Choisissez deux joueurs dans des équipes différentes.');
+      [room.people[seat], room.people[target]] = [room.people[target], room.people[seat]];
+    } else if (command.type === 'kick') {
       try {
         Object.assign(room, excludeGuest(room, user, command.seat));
       } catch (e) {

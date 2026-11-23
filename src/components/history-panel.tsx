@@ -1,25 +1,36 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import type { TurnRecord, View } from '@/game/types';
+import type { View } from '@/game/types';
 import { cardSymbol, COLOR_NAMES } from '@/game/labels';
 import { trackLength } from '@/game/engine';
 import { Board } from './board';
 
-export function HistoryPanel({
-  view,
-  selected,
-  onSelect,
-}: {
-  view: View;
-  selected: TurnRecord | null;
-  onSelect: (record: TurnRecord | null) => void;
-}) {
+export function HistoryPanel({ view, onClose }: { onClose: () => void; view: View }) {
+  const [selectedId, setSelectedId] = useState(view.history?.[0]?.id);
+  const records = view.history ?? [];
+  const index = Math.max(
+    0,
+    records.findIndex((record) => record.id === selectedId),
+  );
+  const selected = records[index];
+  const positions = new Map<string, number>();
+  for (const newer of records.slice(0, index)) {
+    for (const change of [...newer.changes].reverse()) positions.set(change.piece, change.from);
+  }
+  const replay = {
+    ...view,
+    history: [],
+    discard: selected?.card ? [selected.card] : [],
+    pieces: view.pieces.map((piece) =>
+      positions.has(piece.id)
+        ? { ...piece, position: positions.get(piece.id)!, stake: false }
+        : piece,
+    ),
+  };
   const dialog = useRef<HTMLDialogElement>(null);
-  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
-    if (expanded) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [expanded]);
+    dialog.current?.showModal();
+  }, []);
   const position = (n: number) =>
     n < 0
       ? 'réserve'
@@ -32,11 +43,9 @@ export function HistoryPanel({
         <button
           key={record.id}
           className={selected?.id === record.id ? 'selected' : ''}
-          onMouseEnter={() => onSelect(record)}
-          onMouseLeave={() => onSelect(null)}
-          onBlur={() => onSelect(null)}
-          onFocus={() => onSelect(record)}
-          onClick={() => onSelect(record)}
+          onMouseEnter={() => setSelectedId(record.id)}
+          onFocus={() => setSelectedId(record.id)}
+          onClick={() => setSelectedId(record.id)}
           aria-pressed={selected?.id === record.id}
         >
           <b>
@@ -66,55 +75,38 @@ export function HistoryPanel({
     </div>
   );
   return (
-    <section className="history-panel" aria-label="Historique des coups">
-      <div className="history-tools">
-        <button onClick={() => setExpanded(true)}>Agrandir l'historique</button>
-        <button disabled={!selected} onClick={() => onSelect(null)}>
-          Effacer l'aperçu
+    <dialog ref={dialog} className="history-dialog" aria-label="Revoir les coups" onClose={onClose}>
+      <header>
+        <h2>Revoir les coups</h2>
+        <button autoFocus onClick={() => dialog.current?.close()}>
+          Fermer
         </button>
+      </header>
+      <div className="history-replay">
+        <Board
+          game={replay}
+          orient
+          showSeats={false}
+          playable={[]}
+          destinations={[]}
+          onPiece={() => {}}
+          historyChanges={selected?.changes ?? []}
+        />
       </div>
-      <p className="muted">
-        Survolez, sélectionnez au clavier ou touchez un coup. Pointillés orange : départ. Cercle
-        plein : arrivée. Trait rouge : capture.
-      </p>
-      {entries()}
-      <details>
-        <summary>Journal de la partie</summary>
-        <p className="muted">
-          Messages textuels : distributions, échanges, coups et victoire. Les coups détaillés
-          au-dessus permettent de revoir les positions sur le plateau.
-        </p>
-        {view.log.map((line, i) => (
-          <p key={i}>{line}</p>
-        ))}
-      </details>
-      <dialog
-        ref={dialog}
-        className="history-dialog"
-        onClose={() => {
-          setExpanded(false);
-          onSelect(null);
-        }}
-      >
-        <header>
-          <h2>Revoir les coups</h2>
-          <button autoFocus onClick={() => setExpanded(false)}>
-            Fermer
-          </button>
-        </header>
-        <div className="history-replay">
-          <Board
-            game={view}
-            orient
-            playable={[]}
-            destinations={[]}
-            onPiece={() => {}}
-            historyChanges={selected?.changes ?? []}
-          />
-        </div>
-        <p>Départ en pointillés orange, arrivée pleine. Touchez un coup pour le revoir.</p>
+      <div className="history-scroll">
+        <p>Choisissez un coup. Le départ est en pointillés, l'arrivée en trait plein.</p>
         {entries()}
-      </dialog>
-    </section>
+        <details>
+          <summary>Journal de la partie</summary>
+          <p className="muted">
+            Messages textuels : distributions, échanges, coups et victoire. Les coups détaillés
+            au-dessus permettent de revoir les positions sur le plateau.
+          </p>
+          {view.log.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </details>
+      </div>
+    </dialog>
   );
 }

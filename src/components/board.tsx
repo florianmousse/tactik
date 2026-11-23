@@ -25,11 +25,13 @@ export function Board({
   destinations = [],
   onMove,
   orient = false,
+  showSeats = orient,
   historyChanges = [],
 }: {
   game: View;
   historyChanges?: PieceChange[];
   orient?: boolean;
+  showSeats?: boolean;
   destinations?: Move[];
   onMove?: (move: Move) => void;
   selected?: string;
@@ -115,7 +117,11 @@ export function Board({
     <svg
       ref={svg}
       className="board"
-      viewBox={`0 0 ${orientation.width} ${orientation.height}`}
+      viewBox={
+        showSeats
+          ? `-104 -51 ${orientation.width + 208} ${orientation.height + 102}`
+          : `0 0 ${orientation.width} ${orientation.height}`
+      }
       role="group"
       aria-label={`Plateau TAC-TIK ${order.length} couleurs, ${length} cases`}
     >
@@ -356,24 +362,24 @@ export function Board({
                   strokeDasharray={selected === p.id ? undefined : '3 3'}
                 />
               )}
-              <g pointerEvents="none" transform={`rotate(${-orientation.angle})`}>
-                <path d="M-7 -14 L0 -9 L7 -14" fill="#fff" stroke="#263c32" />
-                <rect x="-10" y="-32" width="20" height="19" rx="7" fill="#fff" stroke="#263c32" />
+              <g filter={`url(#${uid}-peg-shadow)`}>
+                <circle
+                  r="9"
+                  fill={PALETTE[p.color]}
+                  stroke={p.stake ? '#121711' : '#453d31'}
+                  strokeWidth={p.stake ? 3 : 1}
+                />
                 <text
-                  x="0"
-                  y="-18"
+                  y="4.5"
                   textAnchor="middle"
                   fontSize="13"
                   fontWeight="bold"
-                  fill="#263c32"
+                  fill={[1, 5, 7].includes(p.color) ? '#141814' : '#fff'}
+                  pointerEvents="none"
+                  transform={`rotate(${-orientation.angle})`}
                 >
                   {n + 1}
                 </text>
-              </g>
-              <g filter={`url(#${uid}-peg-shadow)`}>
-                <circle r="8.5" fill={PALETTE[p.color]} stroke="#26251e" strokeWidth="1.2" />
-                <circle cx="-2" cy="-2" r="4" fill="#fff" opacity=".23" />
-                {p.stake && <circle r="3" fill="#191919" stroke="#fff" strokeWidth="1" />}
               </g>
             </g>
           );
@@ -432,6 +438,88 @@ export function Board({
           })}
         </g>
       </g>
+      {showSeats &&
+        order.map((color, sector) => {
+          const seat = game.players.findIndex((player) => player.colors.includes(color));
+          const player = game.players[seat];
+          const primary = player.colors[0] === color;
+          const reserve = layout.reserves[color];
+          // Project the midpoint of this reserve onto the closest outside edge.
+          const vertical = reserve[0][0] === reserve[1][0];
+          const centerX = (reserve[0][0] + reserve[3][0]) / 2;
+          const centerY = (reserve[0][1] + reserve[3][1]) / 2;
+          const x = (vertical ? (sector === 0 ? 0 : layout.width) : centerX) - layout.width / 2;
+          const y =
+            (vertical ? centerY : sector < order.length / 2 ? 0 : layout.height) -
+            layout.height / 2;
+          const radians = (orientation.angle * Math.PI) / 180;
+          const cos = Math.round(Math.cos(radians)),
+            sin = Math.round(Math.sin(radians));
+          const side = vertical === (sin === 0);
+          const dx = x * cos - y * sin,
+            dy = x * sin + y * cos;
+          const labelX = orientation.width / 2 + dx + (side ? Math.sign(dx) * 52 : 0);
+          const labelY = orientation.height / 2 + dy + (side ? 0 : Math.sign(dy) * 25);
+          const count = primary && seat !== game.me ? game.handCounts[seat] : 0;
+          const role = !primary
+            ? ''
+            : seat === game.dealer
+              ? 'Donneur'
+              : seat === (game.dealer + 1) % game.players.length
+                ? 'Commence la donne'
+                : '';
+          const description = [
+            player.name,
+            COLOR_NAMES[color],
+            role,
+            `${game.handCounts[seat]} cartes`,
+          ]
+            .filter(Boolean)
+            .join(', ');
+          return (
+            <g
+              key={color}
+              transform={`translate(${labelX} ${labelY})`}
+              role="img"
+              aria-label={description}
+            >
+              <title>{description}</title>
+              <rect
+                x="-50"
+                y="-22"
+                width="100"
+                height="44"
+                rx="8"
+                fill="#faf7ee"
+                stroke={PALETTE[color]}
+                strokeWidth="2"
+              />
+              <text textAnchor="middle" y="-5" fontSize="15" fontWeight="bold" fill="#25372d">
+                {player.name.length > 11 ? player.name.slice(0, 10) + '…' : player.name}
+              </text>
+              {Array.from({ length: count }, (_, i) => (
+                <g key={i} transform={`translate(${-count * 4 + i * 8 - (role ? 10 : 0)} 0)`}>
+                  <rect width="12" height="17" rx="2" fill="#305347" stroke="#f8edce" />
+                  <path d="m6 4 3 4-3 4-3-4z" fill="none" stroke="#e3cea2" />
+                </g>
+              ))}
+              {role && (
+                <g transform={`translate(${count ? 28 : 0} 8)`}>
+                  <circle
+                    r="10"
+                    fill="#f6df99"
+                    stroke="#493a25"
+                    strokeDasharray="3 1"
+                    strokeWidth="2"
+                  />
+                  <text y="5" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#34271a">
+                    {seat === game.dealer ? 'D' : '1'}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
     </svg>
   );
 }

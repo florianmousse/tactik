@@ -4,7 +4,7 @@ import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import type { Session } from '@supabase/supabase-js';
 import { createGame, discardHand, exchange, play, simulateMoves, viewFor } from '@/game/engine';
 import { pendingBot, stepBot } from '@/game/bots';
-import type { Capacity, Game, Play, Move, TurnRecord } from '@/game/types';
+import type { Capacity, Game, Play, Move } from '@/game/types';
 import type { RoomView, PublicRoom } from '@/game/room';
 import type { Command } from '@/server/schema';
 import { configurationIssue, onlineConfigured, supabase } from '@/lib/supabase';
@@ -16,12 +16,12 @@ import { Chat } from './chat';
 import { RecentRooms } from './recent-rooms';
 import { HistoryPanel } from './history-panel';
 import { BotHands } from './bot-hands';
-import { TurnOrder } from './turn-order';
 import { unreadMessages } from '@/lib/chat-unread';
 import { PlayerList, PRESENCE_LABELS } from './player-list';
 import { parseRecentRooms, rememberRoom } from '@/lib/recent-rooms';
 import { canRetryAfterRefresh, hasLostRoomAccess } from '@/lib/room-connection';
 
+const BOT_DELAY_MS = 1200;
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 export function GameApp() {
   const [local, setLocal] = useState<Game | null>(null),
@@ -51,12 +51,16 @@ export function GameApp() {
   const [selectedPiece, setSelectedPiece] = useState<string>(),
     [playable, setPlayable] = useState<string[]>([]),
     [zoom, setZoom] = useState(false);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 6000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   const captchaRef = useRef<TurnstileInstance>(null),
     captchaToken = useRef(captcha);
   captchaToken.current = captcha;
   const [showBotHands, setShowBotHands] = useState(false);
   const [draftPreview, setDraftPreview] = useState<Play | null>(null);
-  const [historyPreview, setHistoryPreview] = useState<TurnRecord | null>(null);
   const [chatSeen, setChatSeen] = useState<{ code: string; ids: string[] } | null>(null);
   const [pageVisible, setPageVisible] = useState(true);
   const unread =
@@ -124,7 +128,6 @@ export function GameApp() {
     setDestinations([]);
     setSelectedPiece(undefined);
     setPanel(null);
-    setHistoryPreview(null);
     setTab('public');
     setConnectionState('ok');
     history.replaceState(null, '', location.pathname);
@@ -358,7 +361,10 @@ export function GameApp() {
   }, [room?.code, Boolean(local), synchronize]);
   useEffect(() => {
     if (local && pendingBot(local) >= 0) {
-      const timer = setTimeout(() => setLocal((g) => (g ? stepBot(g, Math.random) : g)), 3000);
+      const timer = setTimeout(
+        () => setLocal((g) => (g ? stepBot(g, Math.random) : g)),
+        BOT_DELAY_MS,
+      );
       return () => clearTimeout(timer);
     }
   }, [local]);
@@ -375,7 +381,7 @@ export function GameApp() {
           if (e instanceof ApiError && e.status === 409) await synchronize(room.code);
           else setError((e as Error).message);
         });
-    }, 3000);
+    }, BOT_DELAY_MS);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -414,7 +420,6 @@ export function GameApp() {
   }
   function solo() {
     generation.current++;
-    setHistoryPreview(null);
     setLocal(
       createGame(
         Array.from({ length: capacity }, (_, i) => ({
@@ -427,7 +432,7 @@ export function GameApp() {
       ),
     );
     setError('');
-    setPanel('log');
+    setPanel(null);
   }
   function localAction(action: () => Game) {
     try {
@@ -438,7 +443,6 @@ export function GameApp() {
     }
   }
   function submitPlay(action: Play) {
-    setHistoryPreview(null);
     if (local) localAction(() => play(local, 0, action, Math.random));
     else if (room) void run({ type: 'play', code: room.code, version: room.version, play: action });
   }
@@ -878,7 +882,6 @@ export function GameApp() {
           </div>
           <section className="setup-preview home-preview" aria-label="Aperçu du plateau">
             <h2>Plateau pour {capacity} joueurs</h2>
-            <a href="/admin">Administration</a>
             <Board
               game={viewFor(
                 createGame(
@@ -902,6 +905,14 @@ export function GameApp() {
                   : '2 panneaux'}{' '}
               · {capacity < 4 ? capacity * 2 : capacity} couleurs
             </p>
+            <a
+              className="admin-link"
+              href="/admin"
+              aria-label="Administration"
+              title="Administration"
+            >
+              ⚙
+            </a>
           </section>
         </section>
       )}
@@ -919,12 +930,47 @@ export function GameApp() {
             <div className="seats">
               {Array.from({ length: room.capacity }, (_, i) => (
                 <div className="seat" key={i}>
-                  <span>{i + 1}</span>
+                  <span>
+                    {room.capacity >= 4 ? `Équipe ${1 + (i % (room.capacity / 2))}` : i + 1}
+                  </span>
                   <b>{room.people[i]?.name ?? 'Place libre'}</b>
                   <small>
                     {room.people[i]?.me ? 'Vous - ' : ''}
                     {room.people[i] ? PRESENCE_LABELS[room.people[i].presence] : ''}
                   </small>
+                  {room.host &&
+                    i > 0 &&
+                    room.capacity >= 4 &&
+                    room.people.length === room.capacity && (
+                      <select
+                        aria-label={`Changer l'équipe de ${room.people[i].name}`}
+                        disabled={busy}
+                        value=""
+                        onChange={(e) =>
+                          run({
+                            type: 'swap-seats',
+                            code: room.code,
+                            version: room.version,
+                            seat: i,
+                            target: Number(e.target.value),
+                          })
+                        }
+                      >
+                        <option value="" disabled>
+                          Changer d'équipe
+                        </option>
+                        {room.people.map(
+                          (other, target) =>
+                            target > 0 &&
+                            target % (room.capacity / 2) !== i % (room.capacity / 2) && (
+                              <option key={target} value={target}>
+                                Équipe {1 + (target % (room.capacity / 2))} - échanger avec{' '}
+                                {other.name}
+                              </option>
+                            ),
+                        )}
+                      </select>
+                    )}
                   {room.host && i > 0 && room.people[i] && (
                     <button
                       disabled={busy}
@@ -945,7 +991,9 @@ export function GameApp() {
               ))}
             </div>
             <p className="muted">
-              {room.capacity >= 4 ? 'Les places opposées forment une équipe.' : ''}
+              {room.capacity >= 4
+                ? "Les partenaires jouent face à face. Une fois le salon complet, l'hôte peut échanger les places pour composer les équipes."
+                : ''}
             </p>
             {room.host && (
               <div className="lobby-actions">
@@ -980,17 +1028,15 @@ export function GameApp() {
         <div className="game-layout">
           <section className="table-area">
             <PlayerList view={view} room={room} local={Boolean(local)} />
-            <TurnOrder view={view} />
             <div className={`board-stage ${zoom ? 'zoomed' : ''}`}>
               <Board
                 game={view}
                 orient
                 selected={selectedPiece}
-                playable={busy || historyPreview ? [] : playable}
-                destinations={historyPreview ? [] : destinations}
+                playable={busy ? [] : playable}
+                destinations={destinations}
                 historyChanges={
-                  historyPreview?.changes ??
-                  (draftPreview &&
+                  draftPreview &&
                   view.options.some(
                     (p) =>
                       p.cardIndex === draftPreview.cardIndex &&
@@ -1003,19 +1049,14 @@ export function GameApp() {
                         draftPreview.moves,
                         (draftPreview.as ?? view.hand[draftPreview.cardIndex]) === 7,
                       ).changes
-                    : [])
+                    : []
                 }
                 onMove={(move) => !busy && interaction.current.move(move)}
                 onPiece={(id) => !busy && interaction.current.piece(id)}
               />
             </div>
             <div className="board-tools">
-              <span>↻ Sens horaire · {view.deckCount} cartes en pioche</span>
-              {historyPreview && (
-                <button onClick={() => setHistoryPreview(null)}>
-                  Fermer l'aperçu du coup {historyPreview.id}
-                </button>
-              )}
+              <span>D : donneur · 1 : commence la donne · {view.deckCount} cartes en pioche</span>
               <button aria-pressed={zoom} onClick={() => setZoom(!zoom)}>
                 {zoom ? 'Ajuster le plateau' : 'Agrandir'}
               </button>
@@ -1055,7 +1096,6 @@ export function GameApp() {
                   aria-pressed={panel === 'log'}
                   onClick={() => {
                     setPanel(panel === 'log' ? null : 'log');
-                    setHistoryPreview(null);
                   }}
                   aria-expanded={panel === 'log'}
                 >
@@ -1067,7 +1107,6 @@ export function GameApp() {
                     aria-pressed={panel === 'chat'}
                     onClick={() => {
                       setPanel(panel === 'chat' ? null : 'chat');
-                      setHistoryPreview(null);
                     }}
                     aria-expanded={panel === 'chat'}
                   >
@@ -1083,7 +1122,7 @@ export function GameApp() {
                   onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
                 />
               ) : panel === 'log' ? (
-                <HistoryPanel view={view} selected={historyPreview} onSelect={setHistoryPreview} />
+                <HistoryPanel view={view} onClose={() => setPanel(null)} />
               ) : null}
             </section>
           </aside>

@@ -118,3 +118,17 @@ test('orientation : départ en bas pour chaque joueur, cibles et plateau restent
     assert.deepEqual(game, before);
   }
 });
+
+test('salon : échange de places versionné, siège hôte et champs inconnus refusés', () => {
+  const command = { type: 'swap-seats', code: 'ABCDEFGH', version: 12, seat: 1, target: 2 };
+  assert.ok(commandSchema.safeParse(command).success);
+  for (const invalid of [
+    { seat: 0 },
+    { target: 0 },
+    { target: 8 },
+    { version: undefined },
+    { user: 'host' },
+  ]) {
+    assert.equal(commandSchema.safeParse({ ...command, ...invalid }).success, false);
+  }
+});
