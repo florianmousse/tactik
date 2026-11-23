@@ -111,3 +111,9 @@ La page `/admin` utilise `/api/admin`, distinct de la projection de partie. `adm
 `Game.memories` est un champ JSON optionnel, privé, contenant une mémoire bornée par joueur (13 compteurs de valeurs, une carte donnée encore connue et l'échange de la donne). `View` exclut explicitement cet ensemble et contient uniquement `knowledge`, la mémoire du demandeur. Aucun changement de commande HTTP ni de SQL ; le serveur calcule et sauvegarde la mémoire avec la même transition CAS. Les anciennes parties sans champ commencent avec une mémoire vide.
 
 `card-knowledge.ts` applique les observations aux états clonés : cartes publiques, défausse complète connue seulement du propriétaire, échanges résolus, nouvelle donne et remélange. Il estime les cartes possibles sans lire la pioche ni le contenu des défausses adverses complètes. `playsForHand` réutilise la génération légale à partir des positions publiques et d'une liste explicite de cartes hypothétiques. `legalPlays` conserve ses contrôles de phase/tour et fournit uniquement la vraie main de l'acteur. La stratégie utilise ces simulations pour le don et pour une continuation autour du dernier pion.
+
+## Statistiques de partie
+
+Le moteur cumule cinq compteurs publics par siège à chaque coup validé. La distance est la valeur absolue de la carte de déplacement annoncée : un 7 partagé vaut sept cases au total, un recul en vaut quatre. Un démarrage et une permutation valent zéro case. Les captures (alliées comprises), sorties et cartes jouées sont attribuées à la personne qui joue, les captures subies au propriétaire de la couleur. Une défausse ne compte pas comme carte jouée.
+
+Les totaux sont enregistrés avec le coup et survivent à la limite de 40 coups du journal. Pour une sauvegarde sans compteurs, le client peut afficher un bilan partiel depuis les traces encore disponibles ; le moteur reprend ces valeurs au premier nouveau tour. Chaque classement conserve les ex aequo.

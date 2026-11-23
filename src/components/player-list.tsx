@@ -1,6 +1,6 @@
 'use client';
 import type { View } from '@/game/types';
-import type { RoomView, Presence, ChatMessage } from '@/game/room';
+import type { RoomView, Presence } from '@/game/room';
 import { PALETTE, COLOR_NAMES } from './board';
 
 export const PRESENCE_LABELS: Record<Presence, string> = {
@@ -13,12 +13,10 @@ export function PlayerList({
   view,
   room,
   local,
-  preview,
 }: {
   view: View;
   room: RoomView | null;
   local: boolean;
-  preview?: ChatMessage;
 }) {
   const players = view.players.map((player, seat) => ({ player, seat }));
   players.sort((a, b) => Number(b.seat === view.me) - Number(a.seat === view.me));
@@ -46,7 +44,6 @@ export function PlayerList({
               {p.name}
               {seat === view.me ? ' (vous)' : ''}
             </b>
-            {preview?.seat === seat && <span className="speech-bubble">{preview.text}</span>}
             <span className={`presence ${presence}`}>{PRESENCE_LABELS[presence]}</span>
             <small>
               {p.colors.map((c) => COLOR_NAMES[c]).join(' + ')} · {view.handCounts[seat]} cartes

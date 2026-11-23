@@ -15,6 +15,7 @@ import { TurnControls } from './turn-controls';
 import { MobileChat } from './mobile-chat';
 import { Chat } from './chat';
 import { RecentRooms } from './recent-rooms';
+import { StatsPanel } from './stats-panel';
 import { HistoryPanel } from './history-panel';
 import { BotHands } from './bot-hands';
 import { unreadMessages } from '@/lib/chat-unread';
@@ -39,6 +40,7 @@ export function GameApp() {
     move: () => {},
   });
   const [tab, setTab] = useState<'create' | 'join' | 'public' | 'recent' | 'solo'>('public');
+  const [statsOpen, setStatsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const [mobile, setMobile] = useState(false);
@@ -117,7 +119,13 @@ export function GameApp() {
   }, [room?.code]);
   const messageKey = room?.messages.map((m) => m.id).join(',') ?? '';
   useEffect(() => {
-    if (!room || !pageVisible || historyOpen || (mobile ? !mobileChatOpen : room.game && !chatOpen))
+    if (
+      !room ||
+      !pageVisible ||
+      statsOpen ||
+      historyOpen ||
+      (mobile ? !mobileChatOpen : room.game && !chatOpen)
+    )
       return;
     const ids = room.messages.map((m) => m.id);
     setChatSeen({ code: room.code, ids });
@@ -131,6 +139,7 @@ export function GameApp() {
     room?.code,
     chatOpen,
     historyOpen,
+    statsOpen,
     mobile,
     mobileChatOpen,
     pageVisible,
@@ -164,6 +173,7 @@ export function GameApp() {
     setPlayable([]);
     setDestinations([]);
     setSelectedPiece(undefined);
+    setStatsOpen(false);
     setHistoryOpen(false);
     setChatOpen(true);
     setMobileChatOpen(false);
@@ -448,6 +458,7 @@ export function GameApp() {
         const address = new URL(location.href);
         address.searchParams.set('salon', next.code);
         history.replaceState(null, '', address);
+        setStatsOpen(false);
         setHistoryOpen(false);
         setChatOpen(true);
         setMobileChatOpen(false);
@@ -475,6 +486,7 @@ export function GameApp() {
       ),
     );
     setError('');
+    setStatsOpen(false);
     setHistoryOpen(false);
     setChatOpen(true);
     setMobileChatOpen(false);
@@ -564,6 +576,16 @@ export function GameApp() {
   const captchaRequired = Boolean(siteKey) && !signedIn;
   const connectionDisabled =
     busy || !onlineConfigured || !authReady || (captchaRequired && !captcha);
+  const mobileChat = mobile && room && !local && (
+    <MobileChat
+      key={room.code}
+      messages={room.messages}
+      unread={unread.length}
+      open={mobileChatOpen}
+      setOpen={setMobileChatOpen}
+      onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
+    />
+  );
   return (
     <main className={view ? 'app playing' : 'app'}>
       <header className="topbar">
@@ -610,16 +632,6 @@ export function GameApp() {
             ×
           </button>
         </div>
-      )}
-      {mobile && room && !local && (
-        <MobileChat
-          key={room.code}
-          messages={room.messages}
-          unread={unread.length}
-          open={mobileChatOpen}
-          setOpen={setMobileChatOpen}
-          onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
-        />
       )}
       {!mobile && unread.length > 0 && room?.game && !chatOpen && !historyOpen && (
         <button className="chat-notification" onClick={() => setChatOpen(true)} aria-live="polite">
@@ -1042,6 +1054,7 @@ export function GameApp() {
                 </div>
               ))}
             </div>
+            {mobileChat}
             <p className="muted">
               {room.capacity >= 4
                 ? "Les partenaires jouent face à face. Une fois le salon complet, l'hôte peut échanger les places pour composer les équipes."
@@ -1081,10 +1094,12 @@ export function GameApp() {
       {view && (
         <div className="game-layout">
           <section className="table-area">
-            <PlayerList preview={preview} view={view} room={room} local={Boolean(local)} />
+            <PlayerList view={view} room={room} local={Boolean(local)} />
+            {mobileChat}
             <div className={`board-stage ${zoom ? 'zoomed' : ''}`}>
               <Board
                 game={view}
+                speech={preview}
                 orient
                 selected={selectedPiece}
                 playable={busy ? [] : playable}
@@ -1161,6 +1176,9 @@ export function GameApp() {
                 ) : (
                   <strong>Journal de la table</strong>
                 )}
+                <button aria-haspopup="dialog" onClick={() => setStatsOpen(true)}>
+                  Statistiques
+                </button>
                 <button aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
                   Historique
                 </button>
@@ -1176,6 +1194,7 @@ export function GameApp() {
               ) : (
                 <p className="last-event">{view.log[0]}</p>
               )}
+              {statsOpen && <StatsPanel view={view} onClose={() => setStatsOpen(false)} />}
               {historyOpen && <HistoryPanel view={view} onClose={() => setHistoryOpen(false)} />}
             </section>
           </aside>

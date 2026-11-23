@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { colorOrder, startPosition, trackLength } from '@/game/engine';
 import { boardLayout, boardOrientation } from '@/game/board-layout';
 import { moveDestination } from '@/game/move-preview';
 import { moveLabel } from '@/game/labels';
+import type { ChatMessage } from '@/game/room';
 import type { View, Move, PieceChange } from '@/game/types';
 import { CardBack, CardFace } from './card-art';
 import { COLOR_NAMES } from '@/game/labels';
@@ -27,12 +28,14 @@ export function Board({
   onMove,
   orient = false,
   showSeats = orient,
+  speech,
   historyChanges = [],
 }: {
   game: View;
   historyChanges?: PieceChange[];
   orient?: boolean;
   showSeats?: boolean;
+  speech?: ChatMessage;
   destinations?: Move[];
   onMove?: (move: Move) => void;
   selected?: string;
@@ -114,6 +117,16 @@ export function Board({
   const orientation = orient
     ? boardOrientation(game, game.players[game.me].colors[0])
     : { angle: 0, width: layout.width, height: layout.height };
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const board = svg.current;
+    if (!speech || !board) return;
+    const measure = () => setScale(board.getScreenCTM()?.a || 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, [speech?.id, orientation.width, orientation.height]);
   return (
     <svg
       ref={svg}
@@ -466,6 +479,15 @@ export function Board({
             dy = x * sin + y * cos;
           const labelX = orientation.width / 2 + dx + (side ? Math.sign(dx) * 52 : 0);
           const labelY = orientation.height / 2 + dy + (side ? 0 : Math.sign(dy) * 25);
+          const speaks = primary && speech?.seat === seat;
+          const bubbleWidth = Math.min(150 / scale, orientation.width / 2);
+          const bubbleX = side
+            ? dx < 0
+              ? -50
+              : 50 - bubbleWidth
+            : dx <= 0
+              ? 54
+              : -54 - bubbleWidth;
           const count = primary && seat !== game.me ? game.handCounts[seat] : 0;
           const role = !primary
             ? ''
@@ -522,6 +544,23 @@ export function Board({
                     {seat === game.dealer ? 'D' : '1'}
                   </text>
                 </g>
+              )}
+              {speaks && (
+                <foreignObject
+                  x={bubbleX}
+                  y={side ? 23 : dy < 0 ? -22 : 20 - 56 / scale}
+                  width={bubbleWidth}
+                  height={60 / scale}
+                  pointerEvents="none"
+                  aria-hidden="true"
+                >
+                  <div
+                    className="board-speech"
+                    style={{ width: bubbleWidth * scale, transform: `scale(${1 / scale})` }}
+                  >
+                    {speech.text}
+                  </div>
+                </foreignObject>
               )}
             </g>
           );

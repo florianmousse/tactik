@@ -158,3 +158,9 @@ Chrome local à 390 x 844 et 1440 x 900, avec réponses API simulées : chat ouv
 ## Cartes et chat flottant
 
 `npm run check` réussi (65 tests et TypeScript strict), puis `npm run build` réussi. Chrome local, salon simulé à deux joueurs homonymes, à 390 x 844 et 1440 x 900 : main de six cartes et absence de débordement horizontal sur les deux formats. Sur mobile, compteur à 1 à la réception, aperçu sur la fiche du bon auteur, disparition après six secondes, compteur effacé à la lecture, brouillon conservé après fermeture par Echap et réouverture. La position du plateau reste stable à l'ouverture du dialogue. Le chat en ligne entre deux identités Supabase reste à vérifier.
+
+## Lisibilité, bulles et classements - 24 novembre 2026
+
+`npm run check` réussi (66 tests et TypeScript strict), puis `npm run build` réussi. Le scénario du 7 partagé vérifie deux captures, la distance totale, le refus du 7 incomplet et la reprise des compteurs depuis un ancien historique.
+
+Chrome local avec un salon simulé, à 390 x 844 et 1440 x 900 : bouton de chat sous la liste des joueurs sur téléphone, aperçu dans le plateau, expiration, compteur de lecture, conservation du brouillon et plateau stable à l'ouverture. Main de six cartes sur bureau avec une largeur de carte supérieure à 60 pixels. Ouverture des statistiques aux deux formats et sélection des cinq classements. Multijoueur réel sur Supabase à vérifier.

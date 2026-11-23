@@ -1,3 +1,4 @@
+import { emptyStats, statsFor, countTurn } from './stats';
 import { emptyKnowledge, memoriesFor, observeCards } from './card-knowledge';
 import {
   CARDS,
@@ -60,6 +61,7 @@ export function createGame(
   }));
   const g: Game = {
     players,
+    stats: emptyStats(players),
     pieces: order.flatMap((c) =>
       Array.from({ length: 4 }, (_, n) => ({
         id: `${c}-${n}`,
@@ -355,6 +357,8 @@ export function simulateMoves(
   return { pieces: state.pieces, changes };
 }
 function rememberTurn(g: Game, entry: Omit<TurnRecord, 'id' | 'round'>) {
+  g.stats = statsFor(g);
+  countTurn(g.stats, g.players, entry);
   g.history = [
     { ...entry, round: g.round, id: (g.history?.[0]?.id ?? 0) + 1 },
     ...(g.history ?? []),

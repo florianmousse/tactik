@@ -301,3 +301,39 @@ test('les coups proposés sont exécutables, état et cartes conservés sur 250 
     assert.equal(new Set(occupied).size, occupied.length);
   }
 });
+test('statistiques : 7 partagé, captures, ancien historique et coup interdit', () => {
+  const g = setup();
+  card(g, 7);
+  piece(g, 0).position = 1;
+  piece(g, 0, 1).position = 12;
+  piece(g, 2).position = 3;
+  piece(g, 1).position = 14;
+  const moves = [
+    { kind: 'move' as const, piece: '0-0', steps: 3 },
+    { kind: 'move' as const, piece: '0-1', steps: 4 },
+  ];
+  assert.throws(() => play(g, 0, { cardIndex: 0, moves: moves.slice(0, 1) }, random));
+  const next = play(g, 0, { cardIndex: 0, moves }, random);
+  assert.equal(g.stats?.players[0].distance, 0);
+  assert.deepEqual(next.stats?.players[0], {
+    distance: 7,
+    captures: 2,
+    losses: 0,
+    starts: 0,
+    plays: 1,
+  });
+  assert.equal(next.stats?.players[1].losses, 1);
+  assert.equal(next.stats?.players[2].losses, 1);
+  delete next.stats;
+  next.turn = 0;
+  card(next, -4);
+  const resumed = play(
+    next,
+    0,
+    { cardIndex: 0, moves: [{ kind: 'move', piece: '0-0', steps: -4 }] },
+    random,
+  );
+  assert.equal(resumed.stats?.partial, true);
+  assert.equal(resumed.stats?.players[0].distance, 11);
+  assert.equal(resumed.stats?.players[0].captures, 2);
+});

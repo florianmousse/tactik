@@ -1,3 +1,4 @@
+import type { GameStats } from './stats';
 export const COLORS = [
   'red',
   'yellow',
@@ -59,6 +60,7 @@ export type Game = {
   log: string[];
   round: number;
   jokers?: boolean;
+  stats?: GameStats;
   history?: TurnRecord[];
   memories?: CardKnowledge[];
 };
