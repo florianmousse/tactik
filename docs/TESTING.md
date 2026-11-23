@@ -154,3 +154,7 @@ Chrome local, entraînement à huit joueurs : huit fiches visibles sans défilem
 `npm run check` réussi (65 tests et TypeScript strict), puis `npm run build` réussi. Un scénario de permutation couvre la cible adverse choisie en premier, le choix entre deux pions propres, le refus d'un pieu adverse et la sélection dans l'ordre inverse.
 
 Chrome local à 390 x 844 et 1440 x 900, avec réponses API simulées : chat ouvert à l'entrée, brouillon conservé après consultation de l'historique, permutation bloquée après un seul choix puis prête après le second, marque de pieu distincte du pion ordinaire. Une erreur de synchronisation simulée affiche Réessayer maintenant ; une lecture réussie le masque. Ces contrôles ne valident pas la connexion à Supabase ni le chat entre deux clients réels.
+
+## Cartes et chat flottant
+
+`npm run check` réussi (65 tests et TypeScript strict), puis `npm run build` réussi. Chrome local, salon simulé à deux joueurs homonymes, à 390 x 844 et 1440 x 900 : main de six cartes et absence de débordement horizontal sur les deux formats. Sur mobile, compteur à 1 à la réception, aperçu sur la fiche du bon auteur, disparition après six secondes, compteur effacé à la lecture, brouillon conservé après fermeture par Echap et réouverture. La position du plateau reste stable à l'ouverture du dialogue. Le chat en ligne entre deux identités Supabase reste à vérifier.

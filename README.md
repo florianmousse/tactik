@@ -131,7 +131,7 @@ La reserve de votre premiere couleur est alignee en bas du plateau. Le titre et 
 
 ## Observation, bots et historique
 
-Le chat signale les nouveaux messages des autres joueurs par un compteur de non-lus et un bandeau lorsque le panneau est ferme. Les messages sont marques lus uniquement lorsque le chat est visible dans un onglet actif. Pas de son ni de notification systeme.
+Le chat signale les nouveaux messages des autres joueurs par un compteur de non-lus. Sur téléphone, la bulle de chat ouvre la conversation au-dessus du plateau. Le dernier message apparaît près du nom de son auteur pendant six secondes, ou jusqu'au message suivant. Les messages sont marques lus uniquement lorsque le chat est visible dans un onglet actif. Pas de son ni de notification systeme.
 
 Les bots simulent les coups legaux avec les seules positions publiques et leur main : ils preferent les alternatives sans capture alliee, y compris sur le passage d'un 7. Si les regles imposent une capture de soi, ils doivent toutefois jouer. Ils evaluent sorties, progression, maisons, permutations et captures adverses. A l'echange, ils peuvent donner un 1 ou un 10 au partenaire encore en reserve, en conservant une sortie si necessaire. Il s'agit d'une heuristique, pas d'une recherche strategique exhaustive.
 

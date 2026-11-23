@@ -72,7 +72,7 @@ Seuls les salons explicitement publics sont listables, avec une projection limit
 
 ## Chat et bots
 
-Le chat utilise `append_room_message`, réservé au serveur après vérification de l'identité et de l'appartenance. Un UUID rend les renvois du même message idempotents. `chat_revision` réveille les lecteurs sans modifier la version CAS du jeu. La base conserve 100 messages par salon, la projection en retourne 50. Aucun corps de message ne passe par Realtime.
+Le chat utilise `append_room_message`, réservé au serveur après vérification de l'identité et de l'appartenance. Un UUID rend les renvois du même message idempotents. `chat_revision` réveille les lecteurs sans modifier la version CAS du jeu. La base conserve 100 messages par salon, la projection en retourne 50. Chaque message projeté indique le siège actuel de son auteur (ou -1 si absent), calculé depuis son identité pour distinguer les homonymes. Aucun corps de message ne passe par Realtime.
 
 Les bots sont des sièges du salon, jamais des identités Auth. Seul l'hôte les ajoute ou les retire avant le lancement. Un navigateur présent demande `bot-tick` ; le serveur vérifie le tour, calcule un seul coup et le sauvegarde par CAS. La stratégie reçoit une projection privée normale. Sans navigateur actif, les bots attendent. Le mode local utilise le même moteur.
 

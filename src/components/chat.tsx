@@ -5,10 +5,12 @@ export function Chat({
   messages,
   onSend,
   disabled = false,
+  visible = true,
 }: {
   messages: ChatMessage[];
   onSend: (id: string, text: string) => Promise<boolean>;
   disabled?: boolean;
+  visible?: boolean;
 }) {
   const [text, setText] = useState(''),
     [busy, setBusy] = useState(false),
@@ -17,8 +19,12 @@ export function Chat({
     list = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const node = list.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [messages.length, messages.at(-1)?.id]);
+    if (!node || !visible) return;
+    const frame = requestAnimationFrame(() => {
+      node.scrollTop = node.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visible, messages.length, messages.at(-1)?.id]);
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim() || busy || disabled) return;

@@ -5,7 +5,8 @@ import { boardLayout, boardOrientation } from '@/game/board-layout';
 import { moveDestination } from '@/game/move-preview';
 import { moveLabel } from '@/game/labels';
 import type { View, Move, PieceChange } from '@/game/types';
-import { cardSymbol, COLOR_NAMES } from '@/game/labels';
+import { CardBack, CardFace } from './card-art';
+import { COLOR_NAMES } from '@/game/labels';
 export { COLOR_NAMES } from '@/game/labels';
 export const PALETTE = [
   '#c7372d',
@@ -259,23 +260,18 @@ export function Board({
             TAC✳TIK
           </text>
           <g transform={`translate(${layout.width / 2 - 68},260)`}>
-            <rect width="60" height="90" rx="6" fill="#263e34" stroke="#f0e4c8" strokeWidth="3" />
-            <text x="30" y="54" textAnchor="middle" fill="#e6d5ad" fontSize="28">
-              ✳
-            </text>
+            <svg width="60" height="90">
+              <CardBack />
+            </svg>
           </g>
           <g transform={`translate(${layout.width / 2 + 8},260)`}>
-            <rect width="60" height="90" rx="6" fill="#fbf4e6" stroke="#a48d65" />
-            <text
-              x="30"
-              y="54"
-              textAnchor="middle"
-              fill="#493b29"
-              fontFamily="Georgia,serif"
-              fontSize="30"
-            >
-              {game.discard.length ? cardSymbol(game.discard.at(-1)!) : ''}
-            </text>
+            {game.discard.length ? (
+              <svg width="60" height="90">
+                <CardFace card={game.discard.at(-1)!} />
+              </svg>
+            ) : (
+              <rect width="60" height="90" rx="6" fill="none" stroke="#aa9069" />
+            )}
           </g>
         </g>
         {currentDestinations.map((move) => {
@@ -509,7 +505,7 @@ export function Board({
               </text>
               {Array.from({ length: count }, (_, i) => (
                 <g key={i} transform={`translate(${-count * 4 + i * 8 - (role ? 10 : 0)} 0)`}>
-                  <rect width="12" height="17" rx="2" fill="#305347" stroke="#f8edce" />
+                  <rect width="12" height="17" rx="2" fill="#192322" stroke="#d4b679" />
                   <path d="m6 4 3 4-3 4-3-4z" fill="none" stroke="#e3cea2" />
                 </g>
               ))}

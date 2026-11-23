@@ -150,8 +150,8 @@ test('ordre : échange, prochain joueur avec cartes, prochaine donne et dernier 
 });
 test('chat : nouveaux UUID, propres messages exclus, réception à longueur constante', () => {
   const messages = [
-    { id: 'new', name: 'A', text: 'Bonjour', at: '', me: false },
-    { id: 'own', name: 'Moi', text: 'Salut', at: '', me: true },
+    { id: 'new', seat: 1, name: 'A', text: 'Bonjour', at: '', me: false },
+    { id: 'own', seat: 0, name: 'Moi', text: 'Salut', at: '', me: true },
   ];
   assert.deepEqual(
     unreadMessages(messages, ['old']).map((m) => m.id),

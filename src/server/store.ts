@@ -97,6 +97,7 @@ async function projection(
     jokers: room.jokers ?? false,
     messages: (data ?? []).reverse().map((m) => ({
       id: m.id,
+      seat: room.people.findIndex((p) => p.id === m.user_id),
       name: m.name,
       text: m.text,
       at: m.created_at,

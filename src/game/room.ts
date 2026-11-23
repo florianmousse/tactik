@@ -1,5 +1,12 @@
 import type { Capacity, Game, Person, View } from './types';
-export type ChatMessage = { id: string; name: string; text: string; at: string; me: boolean };
+export type ChatMessage = {
+  id: string;
+  seat: number;
+  name: string;
+  text: string;
+  at: string;
+  me: boolean;
+};
 export type Room = {
   host: string;
   public?: boolean;

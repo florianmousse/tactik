@@ -12,6 +12,7 @@ import { authErrorMessage, captchaErrorMessage } from '@/lib/auth-errors';
 import { ApiError, requestGame } from '@/lib/game-api';
 import { Board } from './board';
 import { TurnControls } from './turn-controls';
+import { MobileChat } from './mobile-chat';
 import { Chat } from './chat';
 import { RecentRooms } from './recent-rooms';
 import { HistoryPanel } from './history-panel';
@@ -40,6 +41,31 @@ export function GameApp() {
   const [tab, setTab] = useState<'create' | 'join' | 'public' | 'recent' | 'solo'>('public');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
+  const [mobile, setMobile] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 760px)');
+    const update = () => {
+      setMobile(query.matches);
+      setMobileChatOpen(false);
+    };
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const latest = room?.messages.at(-1);
+  const previous = useRef<{ code?: string; id?: string } | null>(null);
+  const [previewId, setPreviewId] = useState<string>();
+  useEffect(() => {
+    const last = previous.current;
+    previous.current = { code: room?.code, id: latest?.id };
+    setPreviewId(undefined);
+    if (!latest || last?.code !== room?.code || last?.id === latest.id) return;
+    setPreviewId(latest.id);
+    const timer = setTimeout(() => setPreviewId(undefined), 6000);
+    return () => clearTimeout(timer);
+  }, [room?.code, latest?.id]);
+  const preview = latest?.id === previewId ? latest : undefined;
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
@@ -91,7 +117,8 @@ export function GameApp() {
   }, [room?.code]);
   const messageKey = room?.messages.map((m) => m.id).join(',') ?? '';
   useEffect(() => {
-    if (!room || !pageVisible || (room.game && (!chatOpen || historyOpen))) return;
+    if (!room || !pageVisible || historyOpen || (mobile ? !mobileChatOpen : room.game && !chatOpen))
+      return;
     const ids = room.messages.map((m) => m.id);
     setChatSeen({ code: room.code, ids });
     try {
@@ -99,7 +126,16 @@ export function GameApp() {
     } catch {
       /* Storage may be disabled. */
     }
-  }, [messageKey, room?.code, chatOpen, historyOpen, pageVisible, Boolean(room?.game)]);
+  }, [
+    messageKey,
+    room?.code,
+    chatOpen,
+    historyOpen,
+    mobile,
+    mobileChatOpen,
+    pageVisible,
+    Boolean(room?.game),
+  ]);
   const alive = useRef(true);
   const generation = useRef(0);
   const roomRef = useRef(room);
@@ -130,6 +166,7 @@ export function GameApp() {
     setSelectedPiece(undefined);
     setHistoryOpen(false);
     setChatOpen(true);
+    setMobileChatOpen(false);
     setTab('public');
     setConnectionError('');
     history.replaceState(null, '', location.pathname);
@@ -413,6 +450,7 @@ export function GameApp() {
         history.replaceState(null, '', address);
         setHistoryOpen(false);
         setChatOpen(true);
+        setMobileChatOpen(false);
       }
       return true;
     } catch (e) {
@@ -439,6 +477,7 @@ export function GameApp() {
     setError('');
     setHistoryOpen(false);
     setChatOpen(true);
+    setMobileChatOpen(false);
   }
   function localAction(action: () => Game) {
     try {
@@ -572,7 +611,17 @@ export function GameApp() {
           </button>
         </div>
       )}
-      {unread.length > 0 && room?.game && !chatOpen && !historyOpen && (
+      {mobile && room && !local && (
+        <MobileChat
+          key={room.code}
+          messages={room.messages}
+          unread={unread.length}
+          open={mobileChatOpen}
+          setOpen={setMobileChatOpen}
+          onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
+        />
+      )}
+      {!mobile && unread.length > 0 && room?.game && !chatOpen && !historyOpen && (
         <button className="chat-notification" onClick={() => setChatOpen(true)} aria-live="polite">
           {unread.length} nouveau{unread.length > 1 ? 'x' : ''} message
           {unread.length > 1 ? 's' : ''} - {unread.at(-1)?.name} - Ouvrir le chat
@@ -936,6 +985,7 @@ export function GameApp() {
                     {room.capacity >= 4 ? `Équipe ${1 + (i % (room.capacity / 2))}` : i + 1}
                   </span>
                   <b>{room.people[i]?.name ?? 'Place libre'}</b>
+                  {preview?.seat === i && <span className="speech-bubble">{preview.text}</span>}
                   <small>
                     {room.people[i]?.me ? 'Vous - ' : ''}
                     {room.people[i] ? PRESENCE_LABELS[room.people[i].presence] : ''}
@@ -1017,19 +1067,21 @@ export function GameApp() {
             )}
             <button onClick={invite}>Copier le lien</button>
           </div>
-          <div className="setup-panel">
-            <h2>Chat du salon</h2>
-            <Chat
-              messages={room.messages}
-              onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
-            />
-          </div>
+          {!mobile && (
+            <div className="setup-panel">
+              <h2>Chat du salon</h2>
+              <Chat
+                messages={room.messages}
+                onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
+              />
+            </div>
+          )}
         </section>
       )}
       {view && (
         <div className="game-layout">
           <section className="table-area">
-            <PlayerList view={view} room={room} local={Boolean(local)} />
+            <PlayerList preview={preview} view={view} room={room} local={Boolean(local)} />
             <div className={`board-stage ${zoom ? 'zoomed' : ''}`}>
               <Board
                 game={view}
@@ -1095,7 +1147,7 @@ export function GameApp() {
             {local && showBotHands && <BotHands game={local} />}
             <section className="session-panel">
               <header className="table-panel-heading">
-                {room && !local ? (
+                {room && !local && !mobile ? (
                   <button
                     type="button"
                     className="chat-toggle"
@@ -1113,9 +1165,10 @@ export function GameApp() {
                   Historique
                 </button>
               </header>
-              {room && !local ? (
+              {room && !local && !mobile ? (
                 <div className="table-chat" hidden={!chatOpen}>
                   <Chat
+                    visible={chatOpen}
                     messages={room.messages}
                     onSend={(id, text) => run({ type: 'chat', code: room.code, id, text })}
                   />

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { CARDS, type BaseCard, type Move, type Play, type View } from '@/game/types';
+import { CardFace } from './card-art';
 import { cardSymbol, cardTitle, moveLabel, COLOR_NAMES } from '@/game/labels';
 import { swapChoices } from '@/game/move-preview';
 import { PALETTE } from './board';
@@ -179,8 +180,7 @@ export function TurnControls({
             aria-label={`Carte ${cardSymbol(c)}, ${cardTitle(c)}`}
             onClick={() => choose(i)}
           >
-            <strong>{cardSymbol(c)}</strong>
-            <span>{cardTitle(c)}</span>
+            <CardFace card={c} />
           </button>
         ))}
       </div>

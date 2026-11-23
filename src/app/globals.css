@@ -457,29 +457,20 @@ legend {
   overflow-x: auto;
 }
 .playing-card {
-  flex: 1 0 42px;
+  flex: 0 1 66px;
   min-width: 42px;
-  max-width: 78px;
-  height: 94px;
-  background: #fffdf6;
-  border-color: #d3c8b4;
-  box-shadow: 0 2px 2px #0001;
-  padding: 7px 3px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
+  aspect-ratio: 84 / 120;
+  align-self: center;
+  padding: 0;
+  display: block;
+  color: var(--ink);
+  background: #fffefa;
+  border: 1px solid #c9beac;
+  border-radius: 7px;
+  box-shadow: 0 2px 3px #33281824;
 }
-.playing-card strong {
-  font:
-    29px Georgia,
-    serif;
-}
-.playing-card span {
-  font-size: 8px;
-  text-transform: uppercase;
-  text-align: center;
+.playing-card svg {
+  display: block;
 }
 .playing-card.chosen {
   border: 2px solid var(--green);
@@ -785,17 +776,7 @@ legend {
     padding-top: 3px;
   }
   .playing-card {
-    height: 68px;
-    max-width: none;
-    min-width: 39px;
-    padding: 3px;
-    gap: 3px;
-  }
-  .playing-card strong {
-    font-size: 23px;
-  }
-  .playing-card span {
-    font-size: 7px;
+    flex-basis: 56px;
   }
   .move-editor {
     max-height: 115px;
@@ -869,7 +850,7 @@ legend {
     min-height: 40px;
   }
   .playing-card {
-    height: 68px;
+    max-width: 49px;
   }
   .move-editor {
     max-height: 100px;
@@ -1528,4 +1509,106 @@ legend {
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--muted);
+}
+
+.player,
+.seat {
+  position: relative;
+}
+.player .speech-bubble,
+.seat .speech-bubble {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% - 2px);
+  left: 5px;
+  width: max-content;
+  max-width: calc(100% - 10px);
+  border-radius: 0 10px 10px;
+  padding: 6px 9px;
+  background: #214938;
+  color: white;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 3px 10px #17291f33;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  pointer-events: none;
+}
+.chat-launcher {
+  position: fixed;
+  z-index: 7;
+  right: max(12px, env(safe-area-inset-right));
+  top: calc(59px + env(safe-area-inset-top));
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: #214938;
+  color: white;
+  border: 2px solid white;
+  box-shadow: 0 3px 10px #17291f40;
+}
+.chat-launcher span {
+  position: absolute;
+  right: -4px;
+  top: -5px;
+  min-width: 19px;
+  border-radius: 12px;
+  background: #a92e28;
+  color: white;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.mobile-chat {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  width: min(calc(100% - 24px), 420px);
+  max-height: 90dvh;
+  background: #fffdf7;
+  color: var(--ink);
+}
+.mobile-chat::backdrop {
+  background: #17291f66;
+}
+body:has(.mobile-chat[open]) {
+  overflow: hidden;
+}
+.mobile-chat-body {
+  display: flex;
+  flex-direction: column;
+  height: min(440px, 76dvh);
+  padding: 14px;
+  gap: 8px;
+}
+.mobile-chat-body header:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mobile-chat-body h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.mobile-chat-body > header button {
+  height: 44px;
+  width: 44px;
+  font-size: 20px;
+}
+.mobile-chat-body .message-list {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.mobile-chat-body input {
+  font-size: 16px;
+}
+@media (max-width: 760px) {
+  .board-stage {
+    height: 52svh;
+  }
 }
