@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import { colorOrder, startPosition, trackLength } from '@/game/engine';
 import { boardLayout, boardOrientation } from '@/game/board-layout';
 import { moveDestination } from '@/game/move-preview';
@@ -19,6 +19,25 @@ export const PALETTE = [
   '#8d4baf',
   '#e98028',
 ];
+function BoardSpeech({ text, width, scale }: { text: string; width: number; scale: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fits, setFits] = useState(false);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (node)
+      setFits(node.scrollHeight <= node.clientHeight && node.scrollWidth <= node.clientWidth);
+  }, [text, width]);
+  return (
+    <div
+      ref={ref}
+      className="board-speech"
+      style={{ width, transform: `scale(${1 / scale})`, visibility: fits ? 'visible' : 'hidden' }}
+    >
+      {text}
+    </div>
+  );
+}
+
 export function Board({
   game,
   selected,
@@ -263,7 +282,7 @@ export function Board({
         <g transform={`rotate(${-orientation.angle} ${layout.width / 2} ${layout.height / 2})`}>
           <text
             x={layout.width / 2}
-            y="240"
+            y="211"
             textAnchor="middle"
             fontFamily="Georgia,serif"
             fontSize="26"
@@ -272,18 +291,18 @@ export function Board({
           >
             TAC✳TIK
           </text>
-          <g transform={`translate(${layout.width / 2 - 68},260)`}>
-            <svg width="60" height="90">
+          <g transform={`translate(${layout.width / 2 - 110},226)`}>
+            <svg width="104" height="148">
               <CardBack />
             </svg>
           </g>
-          <g transform={`translate(${layout.width / 2 + 8},260)`}>
+          <g transform={`translate(${layout.width / 2 + 6},226)`}>
             {game.discard.length ? (
-              <svg width="60" height="90">
+              <svg width="104" height="148">
                 <CardFace card={game.discard.at(-1)!} />
               </svg>
             ) : (
-              <rect width="60" height="90" rx="6" fill="none" stroke="#aa9069" />
+              <rect width="104" height="148" rx="6" fill="none" stroke="#aa9069" />
             )}
           </g>
         </g>
@@ -554,12 +573,7 @@ export function Board({
                   pointerEvents="none"
                   aria-hidden="true"
                 >
-                  <div
-                    className="board-speech"
-                    style={{ width: bubbleWidth * scale, transform: `scale(${1 / scale})` }}
-                  >
-                    {speech.text}
-                  </div>
+                  <BoardSpeech text={speech.text} width={bubbleWidth * scale} scale={scale} />
                 </foreignObject>
               )}
             </g>

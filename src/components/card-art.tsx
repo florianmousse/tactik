@@ -65,17 +65,11 @@ export function CardFace({ card }: { card: Card }) {
         <g key={angle} transform={`rotate(${angle} 42 60)`}>
           {[5, 79].map((x) => (
             <g key={x}>
-              <text
-                x={x}
-                y="23"
-                textAnchor={x === 5 ? 'start' : 'end'}
-                fill={ink}
-                fontSize={card === 7 ? 21 : 26}
-              >
+              <text x={x} y="16" textAnchor={x === 5 ? 'start' : 'end'} fill={ink} fontSize="15">
                 {cardSymbol(card)}
               </text>
               {start && (
-                <g transform={`translate(${x === 5 ? 11 : 73} 33)`}>
+                <g transform={`translate(${x === 5 ? 11 : 73} 24)`}>
                   <circle r="6" fill="#efd17d" stroke="#af8331" />
                   <text y="3" textAnchor="middle" fontSize="8">
                     D
@@ -88,10 +82,10 @@ export function CardFace({ card }: { card: Card }) {
             <text
               key={line}
               x="42"
-              y={lines.length === 1 ? 39 : 32 + i * 11}
+              y={lines.length === 1 ? 32 : 26 + i * 11}
               textAnchor="middle"
-              fontSize="13"
-              textLength={line.length * (start ? 5.4 : 6.4)}
+              fontSize="10"
+              textLength={line.length * 5.6}
               lengthAdjust="spacingAndGlyphs"
             >
               {line}
@@ -107,8 +101,8 @@ export function CardFace({ card }: { card: Card }) {
             tiles.length === 1
               ? 'translate(42 60) rotate(-4)'
               : i === 0
-                ? 'translate(24 59) rotate(4) scale(.89)'
-                : 'translate(59 63) rotate(-5) scale(.89)'
+                ? 'translate(24 56) rotate(4)'
+                : 'translate(59 65) rotate(-5)'
           }
         />
       ))}
