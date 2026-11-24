@@ -201,6 +201,7 @@ export function Board({
           width={layout.width - 6}
           height="594"
           rx="4"
+          className="board-timber"
           fill={`url(#${uid}-timber)`}
           stroke="#b38f5e"
           strokeWidth="3"
@@ -282,7 +283,7 @@ export function Board({
         <g transform={`rotate(${-orientation.angle} ${layout.width / 2} ${layout.height / 2})`}>
           <text
             x={layout.width / 2}
-            y="211"
+            y="222"
             textAnchor="middle"
             fontFamily="Georgia,serif"
             fontSize="26"
@@ -291,18 +292,18 @@ export function Board({
           >
             TAC✳TIK
           </text>
-          <g transform={`translate(${layout.width / 2 - 110},226)`}>
-            <svg width="104" height="148">
+          <g transform={`translate(${layout.width / 2 - 94},237)`}>
+            <svg width="88" height="126">
               <CardBack />
             </svg>
           </g>
-          <g transform={`translate(${layout.width / 2 + 6},226)`}>
+          <g transform={`translate(${layout.width / 2 + 6},237)`}>
             {game.discard.length ? (
-              <svg width="104" height="148">
+              <svg width="88" height="126">
                 <CardFace card={game.discard.at(-1)!} />
               </svg>
             ) : (
-              <rect width="104" height="148" rx="6" fill="none" stroke="#aa9069" />
+              <rect width="88" height="126" rx="6" fill="none" stroke="#aa9069" />
             )}
           </g>
         </g>
